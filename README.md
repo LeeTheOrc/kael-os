@@ -1,77 +1,78 @@
 # Kael-OS
 
-A hybrid AI-native operating system forge built with Tauri, React, and Rust.
+AI-native desktop forge built in Rust with Dioxus + Tauri. No Node/npm/pnpm required.
 
 ## Features
 
-- **Tauri Frontend**: Modern React + TypeScript interface with Vite
-- **Rust Backend**: High-performance backend with SQLite and async support
-- **Kael-AI**: Your AI Guardian integrated throughout
-- **Offline-First**: Local SQLite database with Firebase cloud sync
-- **Modular UI**: Configurable panels (Top Menu, Left/Right Sidebars, Central Chat/Terminal)
-- **No NPM**: Uses pnpm only to avoid dependency hell
+- **Rust + Dioxus Desktop**: Native UI with forge palette and Kael sigil
+- **Kael Personality**: System context + laws baked into Rust backend
+- **Terminal Bridge**: Local shell exec with Arch/paru translator text
+- **Offline-First**: SQLite local store; Firebase sync remains optional
+- **Modular Panels**: Header, chat, left/right sidebars, settings
+- **Pure Rust Build**: No Node toolchain needed
 
 ## Quick Start
 
 ### Prerequisites
-- Rust 1.70+
-- Node.js 18+
-- pnpm
 
-### Installation
+- Rust (via rustup)
+- Platform libs for Tauri/WebKit (see SETUP.md)
 
-```bash
-cd kael-os
-pnpm install
-cargo build --manifest-path src-tauri/Cargo.toml
-```
-
-### Development
+### Run (dev)
 
 ```bash
-pnpm dev
+cd src-tauri
+cargo run
 ```
 
-Or with Tauri directly:
+### Firebase OAuth Setup (Optional)
 
-```bash
-cargo tauri dev
-```
+For Google and GitHub sign-in support:
+
+1. Copy `.env.example` to `.env.local`
+2. Add your Firebase project credentials
+3. See [FIREBASE.md](./FIREBASE.md) for integration notes
+
+Without Firebase configured, the app stays entirely local.
 
 ### Build
 
 ```bash
-pnpm build
-cargo tauri build
+cd src-tauri
+cargo build --release
 ```
 
 ## Project Structure
 
-- `src-tauri/`: Rust backend (Tauri + SQLite)
-- `src/`: React frontend (TypeScript + Tailwind CSS)
+- `src-tauri/`: Rust app (Dioxus Desktop + Tauri + SQLite)
 - `sql/`: Database migrations
-- `public/`: Static assets
 
 ## Architecture
 
-### Frontend (React/TypeScript)
-- Modular component-based UI
-- Services layer for Firebase, LocalDB, Terminal, Kael-AI
-- Tailwind CSS with dark forge theme
-- Type-safe with TypeScript
+### UI (Dioxus)
+
+- Component-based UI in Rust (`src-tauri/src/components`)
+- Forge palette + Kael sigil baked into components
 
 ### Backend (Rust/Tauri)
-- IPC commands for frontend communication
-- SQLite database with migration system
-- Module-based architecture (db, terminal, kael, firebase, api)
+
+- IPC commands for UI
+- SQLite migrations
+- Modules: db, terminal, kael, firebase, api
 - Async/await with Tokio
 
 ## Technologies
 
-- **Frontend**: React 18, TypeScript, Vite, Tailwind CSS
-- **Backend**: Tauri 1.5, Rust, SQLite, Tokio
-- **Database**: SQLite (local) + Firebase (cloud)
-- **Styling**: Tailwind CSS
+- **UI**: Dioxus Desktop
+- **Core**: Tauri 2.x, Rust, SQLite, Tokio
+
+## Roadmap
+
+- **Chat/LLM**: Wire streaming + history (SQLite)
+- **Terminal**: Stream PTY output to UI; keep Arch translations
+- **Settings**: Provider toggles + theme slots
+- **Sync**: Optional Firebase; stays local by default
+- **Packaging**: Cross-platform bundles via `cargo build --release`
 
 ## License
 

@@ -1,41 +1,35 @@
+mod auth;
+mod components;
+mod terminal;
+mod llm;
+mod firebase;
 mod commands;
 mod db;
 mod state;
-mod terminal;
-mod kael;
-mod firebase;
-mod api;
+mod oauth_server;
+mod webview_oauth;
+mod crypto;
+mod gpg;
+mod ssl;
+mod updater;
+mod webdav;
 
-use tauri::Manager;
-use std::sync::Mutex;
+use dioxus::prelude::*;
+use crate::components::app::App;
 
 fn main() {
-    #[cfg_attr(mobile, tauri::mobile_entry_point)]
-    fn run() {
-        tauri::Builder::default()
-            .setup(|app| {
-                // Initialize database
-                let db = db::init_db().expect("Failed to initialize database");
-                app.manage(Mutex::new(db));
-                
-                log::info!("Kael-OS initialized successfully");
-                Ok(())
-            })
-            .invoke_handler(tauri::generate_handler![
-                commands::send_message,
-                commands::get_chat_history,
-                commands::execute_script,
-                commands::execute_terminal_command,
-                commands::get_kael_config,
-                commands::save_kael_config,
-            ])
-            .run(tauri::generate_context!())
-            .expect("error while running tauri application");
-    }
-    
-    #[cfg(mobile)]
-    run();
-    
-    #[cfg(not(mobile))]
-    run();
+    dotenv::from_filename(".env.local").ok();
+    env_logger::init();
+
+    // Initialize OAuth callback server in background
+    // This spawns the server in a separate thread with its own Tokio runtime
+    oauth_server::start_oauth_server();
+
+    // Launch using Dioxus Desktop launcher
+    dioxus_desktop::launch::launch(app, Default::default(), Default::default());
 }
+
+fn app() -> Element {
+    rsx! { App { } }
+}
+

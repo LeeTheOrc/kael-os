@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Kael‑OS Project</title>
+    <style>
+      :root { --bg:#0b0f14; --fg:#e6edf3; --acc:#7dd3fc; --mut:#9aa4ad; }
+      body { margin:0; font-family: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, "Helvetica Neue", Arial, "Noto Sans", "Apple Color Emoji", "Segoe UI Emoji"; background:var(--bg); color:var(--fg); }
+      header { padding:40px 20px; text-align:center; border-bottom:1px solid #1e293b; }
+      h1 { margin:0 0 8px; font-size:2rem; }
+      p.lead { margin:0; color:var(--mut); }
+      nav { display:flex; gap:16px; justify-content:center; padding:12px 20px; }
+      nav a { color:var(--acc); text-decoration:none; }
+      main { max-width:960px; margin:24px auto; padding:0 20px; }
+      .cards { display:grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap:16px; }
+      .card { border:1px solid #1e293b; border-radius:10px; padding:16px; background:#0e141b; }
+      .card h3 { margin:0 0 10px; }
+      footer { text-align:center; padding:24px; color:var(--mut); border-top:1px solid #1e293b; }
+      a.btn { display:inline-block; padding:10px 14px; border-radius:8px; background:#0c4a6e; color:#cdeefa; text-decoration:none; }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>Kael‑OS Project</h1>
+      <p class="lead">Downloads, docs, and updates for Kael‑OS.</p>
+      <nav>
+        <a href="/kael/downloads/">Downloads</a>
+        <a href="/kael/docs/">Docs</a>
+        <a href="/kael/arch/">Arch Install</a>
+      </nav>
+    </header>
+    <main>
+      <section class="cards">
+        <div class="card">
+          <h3>Latest Desktop Build</h3>
+          <p>Grab the latest desktop binary or installer.</p>
+          <a class="btn" href="/kael/downloads/">Go to Downloads</a>
+        </div>
+        <div class="card">
+          <h3>Android APK</h3>
+          <p>Mobile build for Android (coming soon).</p>
+          <a class="btn" href="/kael/downloads/apk/">APK Area</a>
+        </div>
+        <div class="card">
+          <h3>Documentation</h3>
+          <p>Guides and references for using Kael‑OS.</p>
+          <a class="btn" href="/kael/docs/">Read Docs</a>
+        </div>
+      </section>
+    </main>
+    <footer>
+      © 2025 Kael‑OS. All rights reserved.
+    </footer>
+  </body>
+</html>

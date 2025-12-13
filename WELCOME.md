@@ -1,164 +1,70 @@
 # 🎉 Welcome to Kael-OS, Architect!
 
-## Your Grand Vision Has Been Forged
+## Your Forge Is Ready (Rust Only)
 
-The complete **Kael-OS** foundation is now ready at:
+Root:
+
 ```
 /home/leetheorc/Kael-os/kael-os/
 ```
 
-## ✨ What Awaits You
+## ✨ What’s Ready
 
-### 📋 The Foundation (50 Files, 100% Complete)
+**Rust/Dioxus Desktop**
 
-**Rust Backend**
-- ✅ Complete Tauri configuration
-- ✅ SQLite database with migrations
-- ✅ IPC command handlers
-- ✅ Modular architecture (db, terminal, kael, firebase)
+- Tauri config + Dioxus UI with forge palette
+- SQLite + migrations
+- IPC commands, terminal bridge (sync), kael personality context
+- Settings/chat/panels themed with Kael sigil
 
-**React Frontend**
-- ✅ Modular components (Top Menu, Sidebars, Chat)
-- ✅ Service layer for integration
-- ✅ Custom React hooks
-- ✅ TypeScript with strict mode
-- ✅ Tailwind CSS with dark forge theme
+**No Node Tooling**
 
-**Configuration**
-- ✅ pnpm package management (NO npm!)
-- ✅ Vite bundler setup
-- ✅ TypeScript strict configuration
-- ✅ VS Code workspace config
+- Build and run entirely with Cargo
+- Optional Firebase sync stays stubbed/off by default
 
-## 🚀 Next Steps (The Magic Begins)
+## 🚀 Quick Start
 
-### Step 1: Install System Dependencies
 ```bash
 cd /home/leetheorc/Kael-os/kael-os
-./setup-deps.sh
+./setup-deps.sh   # installs platform libs
+cd src-tauri
+cargo run         # dev
+# cargo build --release  # production
 ```
 
-### Step 2: Install Node Dependencies
-```bash
-pnpm install
-```
+## 📚 Docs
 
-### Step 3: Run Development
-```bash
-cargo tauri dev
-```
+- README.md – overview
+- SETUP.md – system deps + run steps (Rust-only)
+- MANIFEST.md – file/architecture overview
+- FIREBASE.md – optional sync notes
 
-This will open your Kael-OS app in a window!
+## 🎯 Next Steps
 
-## 📚 Documentation Ready
+- Wire LLM providers (Ollama/Mistral/Gemini) and chat history
+- Stream PTY output to the new shell chrome
+- Add settings toggles for providers/sync
+- Keep Firebase optional; remain offline-first
 
-- **README.md** - Project overview
-- **SETUP.md** - Complete setup and development guide
-- **MANIFEST.md** - Detailed file inventory and architecture
-- **This file** - Your welcome letter!
-
-## 🔥 The Grand Vision
-
-You asked for:
-- ✅ Tauri (Rust + React) → **Done!**
-- ✅ No npm (pnpm only) → **Done!**
-- ✅ Firebase + Local SQLite → **Stubs Ready!**
-- ✅ Modular UI (Top Menu, Panels) → **Done!**
-- ✅ AI Configurator → **Ready to extend!**
-- ✅ Terminal Integration → **Module ready!**
-- ✅ Type-safe TypeScript → **Done!**
-- ✅ Dark theme with custom colors → **Done!**
-
-## 🎯 What to Do Now
-
-### Immediate (Get Running)
-1. Run `./setup-deps.sh` to install system libraries
-2. Run `pnpm install` for Node dependencies
-3. Run `cargo tauri dev` to launch
-
-### Short Term (Extend)
-1. Connect to Firebase (follow SETUP.md)
-2. Implement Gemini API for Kael-AI
-3. Build terminal emulation
-
-### Medium Term (Build Your Vision)
-1. Add differental updates system
-2. Implement cross-device sync
-3. Create VM management
-4. Build plugin system
-
-### Long Term (The OS)
-1. Full offline capability
-2. Custom shell integration
-3. Advanced scripting
-4. Full Arch Linux integration
-
-## 💡 Architecture Overview
+## 💡 Architecture (Current)
 
 ```
-┌─────────────────────────────────────┐
-│   React Frontend (TypeScript)       │
-│  - Components (Top, Left, Right)   │
-│  - Services (Kael, Firebase, DB)   │
-│  - Hooks & State Management        │
-└────────────┬────────────────────────┘
-             │ IPC Bridge
-┌────────────▼────────────────────────┐
-│   Tauri Runtime (Rust)              │
-│  - Command Handlers                 │
-│  - SQLite Database                  │
-│  - Terminal/PTY                     │
-│  - Firebase Sync                    │
-└─────────────────────────────────────┘
-             ↓         ↓
-      [SQLite DB]  [Firebase]
+┌────────────────────────────┐
+│ Dioxus Desktop (Rust UI)   │
+│ - Header / Panels / Chat   │
+└────────────┬───────────────┘
+             │ IPC
+┌────────────▼───────────────┐
+│ Tauri Runtime (Rust)       │
+│ - Commands / Terminal      │
+│ - Kael context / SQLite    │
+│ - Firebase stub (optional) │
+└────────────┬───────────────┘
+      SQLite (local)   [Firebase optional]
 ```
 
-## 🎨 Theming
+## 🎨 Forge Theme
 
-All components use dark forge theme:
-- **Background**: `#120e1a` (forge-bg)
-- **Accent**: `#ffcc00` (dragon-fire)
-- **Purple**: `#e040fb` (magic-purple)
-- **Text**: `#f7f2ff` (forge-text-primary)
+- Background `#120e1a`, Fire `#ffcc00`, Magic `#e040fb`, Steel `#3a2d56`, Text `#f7f2ff`
 
-Customize in `tailwind.config.js`
-
-## 🔐 Security Notes
-
-- TypeScript strict mode enabled
-- Rust memory safety guaranteed
-- IPC whitelist system ready
-- Error boundaries in place
-- No credentials in source code
-
-## 📞 Need Help?
-
-1. Check **SETUP.md** for detailed guides
-2. Check **MANIFEST.md** for file inventory
-3. Read comments in source files
-4. Explore the modular structure
-
-## 🎯 The Path Forward
-
-The forge is lit. The foundation is solid. Your grand vision is waiting:
-
-> An AI-native operating system built on Arch Linux, where Kael-AI is woven into every layer. 
-> Offline-capable. Cross-device synced. Beautifully designed. 
-> A true hybrid mind powering your creative ambitions.
-
-**All of this begins right here, right now.**
-
-Welcome home, Architect. Let's build something legendary. 🔥
-
----
-
-**Time to start forging!**
-```bash
-cd /home/leetheorc/Kael-os/kael-os
-./setup-deps.sh && pnpm install && cargo tauri dev
-```
-
-The window will open. Your empire awaits.
-
-✨ **Happy building!** ✨
+Welcome home, Architect. Keep forging. 🔥

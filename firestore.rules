@@ -1,0 +1,18 @@
+// These rules grant a user access to a node matching their user ID, but only if the request originates
+// from that user. Nobody else can see anyone else's data.
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Match any document in the 'users' collection
+    match /users/{userId} {
+      // Allow the authenticated user to read and write their own document
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+
+      // Match any document in the 'credentials' subcollection for that user
+      match /credentials/{credentialId} {
+        // Allow the authenticated user to read, write, create, and delete their own credentials
+        allow read, write, create, delete: if request.auth != null && request.auth.uid == userId;
+      }
+    }
+  }
+}

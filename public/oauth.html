@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Kael OS Auth</title>
+  <style>
+    body { font-family: system-ui, sans-serif; margin: 0; background: #0f0b1a; color: #f7f2ff; }
+    .wrap { display: flex; align-items: center; justify-content: center; height: 100vh; }
+    .card { width: 420px; background: #1c162b; border: 1px solid #3a2d56; border-radius: 12px; padding: 18px; box-shadow: 0 18px 36px #0008; }
+    h1 { font-size: 18px; margin: 0 0 12px; color: #ffcc00; }
+    button { width: 100%; padding: 12px; border-radius: 10px; border: 1px solid #3a2d56; cursor: pointer; margin: 8px 0; font-weight: 700; }
+    .google { background: linear-gradient(135deg, #4285f4, #357ae8); color: white; border-color: #357ae8; }
+    .github { background: #24292e; color: white; border-color: #444; }
+    .status { font-size: 12px; color: #a99ec3; margin-top: 10px; }
+    .error { color: #ff6b6b; }
+  </style>
+  <!-- Firebase SDKs -->
+  <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-auth-compat.js"></script>
+</head>
+<body>
+  <div class="wrap">
+    <div class="card">
+      <h1>Authenticate</h1>
+      <button id="googleBtn" class="google">Sign in with Google</button>
+      <button id="githubBtn" class="github">Sign in with GitHub</button>
+      <div id="status" class="status"></div>
+    </div>
+  </div>
+  <script>
+    // Read config from environment passed via query or assume defaults
+    // Since we're in a desktop webview, we cannot read process env directly.
+    // We rely on the parent to embed this page or we hardcode from .env.local build.
+    const params = new URLSearchParams(location.search);
+    const apiKey = params.get('apiKey') || '" + (process.env.VITE_FIREBASE_API_KEY || "") + "';
+    const authDomain = params.get('authDomain') || '" + (process.env.VITE_FIREBASE_AUTH_DOMAIN || "") + "';
+    const projectId = params.get('projectId') || '" + (process.env.VITE_FIREBASE_PROJECT_ID || "") + "';
+
+    const status = document.getElementById('status');
+    function setStatus(msg, isError=false) {
+      status.textContent = msg;
+      status.className = 'status' + (isError ? ' error' : '');
+    }
+
+    if (!apiKey || !authDomain || !projectId) {
+      setStatus('Missing Firebase config (apiKey/authDomain/projectId). Pass as query params.', true);
+    }
+
+    const firebaseConfig = { apiKey, authDomain, projectId };
+    firebase.initializeApp(firebaseConfig);
+    const auth = firebase.auth();
+
+    document.getElementById('googleBtn').addEventListener('click', async () => {
+      try {
+        setStatus('Opening Google popup...');
+        const provider = new firebase.auth.GoogleAuthProvider();
+        const result = await auth.signInWithPopup(provider);
+        const user = result.user;
+        const idToken = await user.getIdToken();
+        const payload = { id_token: idToken, email: user.email, name: user.displayName, photo_url: user.photoURL };
+        if (window.__TAURI__) {
+          await window.__TAURI__.invoke('oauth_result', { result: payload });
+        } else {
+          window.parent.postMessage({ type: 'oauth_success', ...payload }, '*');
+        }
+        setStatus('Signed in as ' + user.email);
+      } catch (e) {
+        console.error(e);
+        setStatus('Google auth failed: ' + e.message, true);
+        if (window.__TAURI__) {
+          // You might want a command to report errors too
+        } else {
+          window.parent.postMessage({ type: 'oauth_error', provider: 'google', message: e.message }, '*');
+        }
+      }
+    });
+
+    document.getElementById('githubBtn').addEventListener('click', async () => {
+      try {
+        setStatus('Opening GitHub popup...');
+        const provider = new firebase.auth.GithubAuthProvider();
+        provider.addScope('user:email');
+        const result = await auth.signInWithPopup(provider);
+        const user = result.user;
+        const idToken = await user.getIdToken();
+        const payload = { id_token: idToken, email: user.email, name: user.displayName, photo_url: user.photoURL };
+        if (window.__TAURI__) {
+          await window.__TAURI__.invoke('oauth_result', { result: payload });
+        } else {
+          window.parent.postMessage({ type: 'oauth_success', ...payload }, '*');
+        }
+        setStatus('Signed in as ' + user.email);
+      } catch (e) {
+        console.error(e);
+        setStatus('GitHub auth failed: ' + e.message, true);
+        if (window.__TAURI__) {
+          // You might want a command to report errors too
+        } else {
+          window.parent.postMessage({ type: 'oauth_error', provider: 'github', message: e.message }, '*');
+        }
+      }
+    });
+  </script>
+</body>
+</html>

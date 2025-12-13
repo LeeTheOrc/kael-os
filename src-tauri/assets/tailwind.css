@@ -1,0 +1,16 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer components {
+    .chat-bubble-kael {
+        @apply p-4 bg-forge-panel rounded-lg mb-4 text-forge-text-secondary border border-forge-border;
+    }
+    .chat-bubble-user {
+        @apply p-4 bg-forge-panel rounded-lg mb-4;
+    }
+    .menu-button {
+        @apply px-3 py-1 rounded hover:bg-forge-border transition-colors;
+    }
+}
+

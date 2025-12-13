@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>OAuth Modal</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: #0a0914;
+        }
+
+        .oauth-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(0, 0, 0, 0.7);
+            z-index: 9999;
+        }
+
+        .modal-content {
+            background: linear-gradient(150deg, #1c162b 0%, #120e1a 55%, #0f0c1a 100%);
+            border-radius: 16px;
+            border: 1px solid #3a2d56;
+            box-shadow: 0 14px 34px #00000066;
+            width: 90%;
+            max-width: 500px;
+            height: 600px;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .modal-header {
+            padding: 16px;
+            border-bottom: 1px solid #3a2d56;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: rgba(0, 0, 0, 0.3);
+        }
+
+        .modal-header h2 {
+            margin: 0;
+            color: #f7f2ff;
+            font-size: 18px;
+        }
+
+        .close-btn {
+            background: none;
+            border: none;
+            color: #a99ec3;
+            font-size: 24px;
+            cursor: pointer;
+            padding: 0;
+            width: 30px;
+            height: 30px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .close-btn:hover {
+            color: #f7f2ff;
+        }
+
+        .modal-body {
+            flex: 1;
+            overflow: hidden;
+            position: relative;
+        }
+
+        iframe {
+            width: 100%;
+            height: 100%;
+            border: none;
+        }
+
+        .loading {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            color: #a99ec3;
+        }
+
+        .spinner {
+            border: 2px solid #3a2d56;
+            border-radius: 50%;
+            border-top: 2px solid #ffcc00;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin-right: 12px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="oauth-modal" id="oauthModal" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="modalTitle">Sign In</h2>
+                <button class="close-btn" onclick="closeModal()">×</button>
+            </div>
+            <div class="modal-body" id="modalBody">
+                <div class="loading">
+                    <div class="spinner"></div>
+                    <span>Loading...</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Store the OAuth result globally
+        window.oauthResult = null;
+        let oauthModalIframe = null;
+        let monitorInterval = null;
+
+        /**
+         * Open OAuth modal with the given provider and URL
+         */
+        async function openOAuthModal(provider, url) {
+            const modal = document.getElementById('oauthModal');
+            const modalTitle = document.getElementById('modalTitle');
+            const modalBody = document.getElementById('modalBody');
+
+            // Update title
+            const titles = {
+                google: 'Sign in with Google',
+                github: 'Sign in with GitHub'
+            };
+            modalTitle.textContent = titles[provider] || 'Sign In';
+
+            // Create iframe
+            oauthModalIframe = document.createElement('iframe');
+            oauthModalIframe.src = url;
+            oauthModalIframe.sandbox.add('allow-same-origin');
+            oauthModalIframe.sandbox.add('allow-top-navigation');
+            oauthModalIframe.sandbox.add('allow-forms');
+            oauthModalIframe.sandbox.add('allow-scripts');
+
+            // Clear loading and add iframe
+            modalBody.innerHTML = '';
+            modalBody.appendChild(oauthModalIframe);
+
+            // Show modal
+            modal.style.display = 'flex';
+
+            // Start monitoring for callback
+            monitorOAuthCallback(provider);
+        }
+
+        /**
+         * Monitor the iframe for OAuth callback
+         */
+        function monitorOAuthCallback(provider) {
+            if (monitorInterval) {
+                clearInterval(monitorInterval);
+            }
+
+            monitorInterval = setInterval(async () => {
+                try {
+                    // Try to access iframe location - this will fail if cross-origin
+                    // Instead, we rely on the backend detecting the callback
+                    const result = await window.invokeCommand('get_stored_oauth_code');
+                    
+                    if (result && result.code) {
+                        // OAuth code received!
+                        window.oauthResult = result;
+                        console.log('OAuth result received:', result);
+                        
+                        // Exchange token
+                        closeModal();
+                        await exchangeOAuthToken(result.provider, result.code);
+                    }
+                } catch (error) {
+                    // Continue monitoring
+                }
+            }, 500);
+
+            // Also set a timeout to close after 5 minutes
+            setTimeout(() => {
+                if (monitorInterval) {
+                    clearInterval(monitorInterval);
+                    monitorInterval = null;
+                }
+            }, 5 * 60 * 1000);
+        }
+
+        /**
+         * Exchange OAuth code for token
+         */
+        async function exchangeOAuthToken(provider, code) {
+            try {
+                console.log('Exchanging OAuth token for provider:', provider);
+                const user = await window.invokeCommand('exchange_oauth_token', {
+                    provider,
+                    code
+                });
+                
+                console.log('Token exchange successful, user:', user);
+                
+                // Dispatch event that login succeeded
+                window.dispatchEvent(new CustomEvent('oauth-success', {
+                    detail: { provider, user }
+                }));
+            } catch (error) {
+                console.error('Token exchange failed:', error);
+                window.dispatchEvent(new CustomEvent('oauth-error', {
+                    detail: { provider, error: error.message }
+                }));
+            }
+        }
+
+        /**
+         * Close the OAuth modal
+         */
+        function closeModal() {
+            const modal = document.getElementById('oauthModal');
+            modal.style.display = 'none';
+
+            if (monitorInterval) {
+                clearInterval(monitorInterval);
+                monitorInterval = null;
+            }
+
+            if (oauthModalIframe) {
+                oauthModalIframe.src = 'about:blank';
+                oauthModalIframe = null;
+            }
+        }
+
+        // Listen for close button clicks
+        document.addEventListener('DOMContentLoaded', () => {
+            document.querySelector('.close-btn').addEventListener('click', closeModal);
+            document.getElementById('oauthModal').addEventListener('click', (e) => {
+                if (e.target.id === 'oauthModal') {
+                    closeModal();
+                }
+            });
+        });
+    </script>
+</body>
+</html>
