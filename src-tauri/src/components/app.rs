@@ -2,11 +2,16 @@
 use dioxus::prelude::*;
 
 use crate::auth::AuthService;
+use crate::components::app_tracker_manager::AppTrackerManager;
+use crate::components::brainstorm::BrainstormPanel;
 use crate::components::chat::ChatPanel;
 use crate::components::header::Header;
 use crate::components::icons::{KaelSigilIcon, PanelIcon, SparkIcon};
+use crate::components::project_archive_settings::ProjectArchiveSettings;
 use crate::components::settings::SettingsPanel;
 use crate::components::terminal::TerminalPanel;
+use crate::state::{AppProject, AppStatus};
+use crate::llm;
 
 // Strip ANSI escape sequences from text (robustly skips ESC sequences)
 fn strip_ansi(text: &str) -> String {
@@ -28,6 +33,39 @@ fn strip_ansi(text: &str) -> String {
         }
     }
     out
+}
+
+// Load app projects from persistent storage
+fn load_projects() -> Vec<AppProject> {
+    if let Ok(json) = std::fs::read_to_string("/tmp/kael_projects.json") {
+        serde_json::from_str(&json).unwrap_or_default()
+    } else {
+        // Default projects
+        vec![
+            AppProject::new(
+                "Kael-CLI".to_string(),
+                "Command-line interface for Kael-OS".to_string(),
+                AppStatus::Making,
+            ),
+            AppProject::new(
+                "Kael-Web".to_string(),
+                "Web-based dashboard for remote management".to_string(),
+                AppStatus::Want,
+            ),
+            AppProject::new(
+                "Kael-Tests".to_string(),
+                "Integration test suite".to_string(),
+                AppStatus::Testing,
+            ),
+        ]
+    }
+}
+
+// Save app projects to persistent storage
+fn save_projects(projects: &[AppProject]) {
+    if let Ok(json) = serde_json::to_string(projects) {
+        let _ = std::fs::write("/tmp/kael_projects.json", json);
+    }
 }
 
 #[allow(non_snake_case)]
@@ -61,9 +99,73 @@ pub fn App() -> Element {
     let current_command = use_signal(String::new);
     let auth_service = use_signal(|| AuthService::new());
     let show_settings = use_signal(|| false);
+    let mut projects = use_signal(|| load_projects());
+    let mut clear_chat_trigger = use_signal(|| false);
+    let chat_messages_out = use_signal(Vec::<crate::components::chat::Message>::new);
+    let hybrid_assist = use_signal(|| false);
+    let mut show_brainstorm = use_signal(|| false);
     let pty_instance = use_signal(|| {
         use crate::terminal::PtyTerminal;
         PtyTerminal::new()
+    });
+
+    // Prefetch provider API keys on authentication to avoid first-request delay
+    {
+        let auth_signal = auth_service.clone();
+        use_effect(move || {
+            if let Some(user) = auth_signal.read().get_user() {
+                spawn(async move {
+                    match crate::firebase::get_api_keys(&user).await {
+                        Ok(keys) => {
+                            let simple: Vec<serde_json::Value> = keys
+                                .into_iter()
+                                .map(|k| serde_json::json!({"name": k.name, "value": k.value}))
+                                .collect();
+                            let json = serde_json::to_string(&simple).unwrap_or_else(|_| "[]".to_string());
+                            let _ = std::fs::write("/tmp/kael_cached_keys.json", json);
+                            log::info!("Prefetched provider keys and cached to /tmp/kael_cached_keys.json");
+                        }
+                        Err(e) => {
+                            log::warn!("Failed to prefetch provider keys: {}", e);
+                        }
+                    }
+                });
+            }
+        });
+    }
+
+    // Load hybrid assist flag from cache
+    {
+        let mut ha = hybrid_assist.clone();
+        use_effect(move || {
+            if let Ok(v) = std::fs::read_to_string("/tmp/kael_hybrid_assist.json") {
+                if v.trim() == "true" {
+                    ha.set(true);
+                }
+            }
+        });
+    }
+
+    // Ensure Ollama is running, then warm local AI on app start
+    use_effect(move || {
+        spawn(async move {
+            // Try to ensure Ollama service is running
+            crate::services::ollama_manager::ensure_ollama_running().await;
+            
+            // Wait a moment for Ollama to be ready
+            tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
+            
+            // Now warm the model
+            let model = std::env::var("OLLAMA_WARMUP_MODEL")
+                .or_else(|_| std::env::var("OLLAMA_MODEL"))
+                .unwrap_or_else(|_| "llama3:latest".to_string());
+            let warmed = llm::warm_local_model(&model).await;
+            if warmed {
+                log::info!("Local AI warmup complete for model {}", model);
+            } else {
+                log::warn!("Local AI warmup failed or Ollama unavailable");
+            }
+        });
     });
 
     // Spawn PTY terminal session on mount
@@ -241,6 +343,13 @@ pub fn App() -> Element {
                                 span { style: "color: {color}; font-size: 12px;", "{state}" }
                             }
                         }
+                        // Brainstorm Ideas toggle
+                        button {
+                            class: "w-full mt-3",
+                            style: "padding: 8px 12px; border-radius: 8px; border: 1px solid #3a2d56; background: linear-gradient(135deg, #e040fb 0%, #ffcc00 100%); color: #120e1a; font-weight: 600; font-size: 13px;",
+                            onclick: move |_| show_brainstorm.set(!show_brainstorm()),
+                            if show_brainstorm() { "💡 Close Ideas" } else { "💡 Open Ideas Panel" }
+                        }
                     }
 
                     div { class: "left-card p-3",
@@ -256,24 +365,49 @@ pub fn App() -> Element {
                                 let timestamp = Local::now().format("%Y%m%d_%H%M%S").to_string();
                                 let filename = format!("kael_chat_{}.txt", timestamp);
 
-                                if let Ok(json_content) = std::fs::read_to_string("/tmp/kael_chat_history.json") {
-                                    if let Ok(messages) = serde_json::from_str::<Vec<serde_json::Value>>(&json_content) {
-                                        let mut text_content = format!("Kael Chat Export - {}\n", Local::now().format("%Y-%m-%d %H:%M:%S"));
-                                        text_content.push_str(&"=".repeat(60));
-                                        text_content.push_str("\n\n");
+                                let mut text_content = format!("Kael Chat Export - {}\n", Local::now().format("%Y-%m-%d %H:%M:%S"));
+                                text_content.push_str(&"=".repeat(60));
+                                text_content.push_str("\n\n");
 
-                                        for msg in messages {
-                                            if let (Some(author), Some(text)) = (msg.get("author").and_then(|a| a.as_str()), msg.get("text").and_then(|t| t.as_str())) {
-                                                text_content.push_str(&format!("[{}]\n{}\n\n", author, text));
+                                match std::fs::read_to_string("/tmp/kael_chat_history.json") {
+                                    Ok(json_content) => {
+                                        match serde_json::from_str::<Vec<serde_json::Value>>(&json_content) {
+                                            Ok(messages) => {
+                                                for msg in messages {
+                                                    if let (Some(author), Some(text)) = (msg.get("author").and_then(|a| a.as_str()), msg.get("text").and_then(|t| t.as_str())) {
+                                                        text_content.push_str(&format!("[{}]\n{}\n\n", author, text));
+                                                    }
+                                                }
+                                            }
+                                            Err(e) => {
+                                                log::error!("Failed to parse chat history for export: {}", e);
+                                                text_content.push_str("(No messages: history parse failed)\n");
                                             }
                                         }
-
-                                        let save_path = format!("/tmp/{}", filename);
-                                        match std::fs::write(&save_path, text_content) {
-                                            Ok(_) => log::info!("Chat saved to: {}", save_path),
-                                            Err(e) => log::error!("Failed to save chat: {}", e),
+                                    }
+                                    Err(e) => {
+                                        if e.kind() == std::io::ErrorKind::NotFound {
+                                            // Use live in-memory messages from ChatPanel
+                                            let live = chat_messages_out();
+                                            if live.is_empty() {
+                                                log::info!("No chat history file to export; writing empty export");
+                                                text_content.push_str("(No messages: history file missing)\n");
+                                            } else {
+                                                for m in live {
+                                                    text_content.push_str(&format!("[{}]\n{}\n\n", m.author, m.text));
+                                                }
+                                            }
+                                        } else {
+                                            log::error!("Failed to read chat history: {}", e);
+                                            text_content.push_str("(No messages: history read error)\n");
                                         }
                                     }
+                                }
+
+                                let save_path = format!("/tmp/{}", filename);
+                                match std::fs::write(&save_path, text_content) {
+                                    Ok(_) => log::info!("Chat saved to: {}", save_path),
+                                    Err(e) => log::error!("Failed to save chat: {}", e),
                                 }
                             },
                             "💾 Save Chat"
@@ -285,9 +419,28 @@ pub fn App() -> Element {
                                 match std::fs::remove_file("/tmp/kael_chat_history.json") {
                                     Ok(_) => {
                                         log::info!("Chat history cleared");
-                                        // Optionally reload the page or reset messages
+                                        clear_chat_trigger.set(true);
+                                        // reset back to false after short delay to allow future clears
+                                        let mut trig = clear_chat_trigger.clone();
+                                        spawn(async move {
+                                            tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+                                            trig.set(false);
+                                        });
                                     },
-                                    Err(e) => log::error!("Failed to clear chat: {}", e),
+                                    Err(e) => {
+                                        // Ignore if file did not exist
+                                        if e.kind() == std::io::ErrorKind::NotFound {
+                                            log::info!("Chat history already clear (file missing)");
+                                            clear_chat_trigger.set(true);
+                                            let mut trig = clear_chat_trigger.clone();
+                                            spawn(async move {
+                                                tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+                                                trig.set(false);
+                                            });
+                                        } else {
+                                            log::error!("Failed to clear chat: {}", e);
+                                        }
+                                    }
                                 }
                             },
                             "🗑️ Delete Chat"
@@ -302,21 +455,29 @@ pub fn App() -> Element {
                 div {
                     class: "chat-container",
                     style: "display: flex; flex-direction: column; flex: 1; gap: 16px;",
-                    {
-                        let user_photo_url = auth_service.read().get_user().and_then(|u| u.photo_url);
-                        let user_name = auth_service.read().get_user().map(|u| u.name).unwrap_or_else(|| "Architect".to_string());
-                        rsx! {
-                            ChatPanel {
-                                term_out: terminal_output.clone(),
-                                pty: pty_instance.clone(),
-                                current_cmd: current_command.clone(),
-                                user_photo_url: user_photo_url,
-                                user_name: user_name,
-                                auth_service: auth_service.clone(),
+                    if show_brainstorm() {
+                        BrainstormPanel { auth_service: auth_service.clone() }
+                    } else {
+                        {
+                            let user_photo_url = auth_service.read().get_user().and_then(|u| u.photo_url);
+                            let user_name = auth_service.read().get_user().map(|u| u.name).unwrap_or_else(|| "Architect".to_string());
+                            rsx! {
+                                ChatPanel {
+                                    term_out: terminal_output.clone(),
+                                    pty: pty_instance.clone(),
+                                    current_cmd: current_command.clone(),
+                                    user_photo_url: user_photo_url,
+                                    user_name: user_name,
+                                    auth_service: auth_service.clone(),
+                                    clear_chat_trigger: clear_chat_trigger.clone(),
+                                    messages_out: chat_messages_out.clone(),
+                                    last_provider: use_signal(|| String::new()),
+                                    hybrid_assist: hybrid_assist.clone(),
+                                }
                             }
                         }
+                        TerminalPanel { term_out: terminal_output.clone() }
                     }
-                    TerminalPanel { term_out: terminal_output.clone() }
                 },
                 // Right Splitter
                 div {
@@ -347,13 +508,62 @@ pub fn App() -> Element {
                         }
                     }
 
-                    div { class: "status-card",
+                    div { class: "status-card mb-3",
                         div { class: "flex items-center gap-2 mb-2", PanelIcon { class: "w-4 h-4 text-[#7aebbe]" }, span { style: "color: #f7f2ff; font-weight: 700;", "Runtime" } }
                         p { style: "margin: 0; color: #cbd5ff; font-size: 13px;", "Arch + paru translator wired." }
                         div { style: "margin-top: 8px; display: flex; gap: 8px; flex-wrap: wrap;",
                             span { class: "chip", style: "color: #7aebbe;", "Arch" }
                             span { class: "chip", style: "color: #ffcc00;", "Paru" }
                             span { class: "chip", style: "color: #e040fb;", "LLM Ready" }
+                        }
+                    }
+
+                    // App Projects Tracker
+                    {
+                        let archived_projects: Vec<AppProject> = projects().iter().filter(|p| p.archived).cloned().collect();
+                        let active_projects: Vec<AppProject> = projects().iter().filter(|p| !p.archived).cloned().collect();
+                        
+                        rsx! {
+                            AppTrackerManager {
+                                projects: active_projects,
+                                on_add: move |new_project: AppProject| {
+                                    projects.write().push(new_project.clone());
+                                    save_projects(&projects());
+                                },
+                                on_remove: move |project_id: String| {
+                                    projects.write().retain(|p| p.id != project_id);
+                                    save_projects(&projects());
+                                },
+                                on_status_change: move |(project_id, new_status): (String, AppStatus)| {
+                                    if let Some(project) = projects.write().iter_mut().find(|p| p.id == project_id) {
+                                        project.status = new_status;
+                                    }
+                                    save_projects(&projects());
+                                },
+                                on_archive: move |(project_id, archived): (String, bool)| {
+                                    if let Some(project) = projects.write().iter_mut().find(|p| p.id == project_id) {
+                                        project.archived = archived;
+                                    }
+                                    save_projects(&projects());
+                                },
+                            }
+
+                            // Archived Projects Settings
+                            if archived_projects.len() > 0 {
+                                ProjectArchiveSettings {
+                                    archived_projects: archived_projects,
+                                    on_restore: move |(project_id, unarchive): (String, bool)| {
+                                        if let Some(project) = projects.write().iter_mut().find(|p| p.id == project_id) {
+                                            project.archived = unarchive;
+                                        }
+                                        save_projects(&projects());
+                                    },
+                                    on_delete: move |project_id: String| {
+                                        projects.write().retain(|p| p.id != project_id);
+                                        save_projects(&projects());
+                                    },
+                                }
+                            }
                         }
                     }
                 }
