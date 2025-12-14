@@ -61,6 +61,8 @@ pub enum AppStatus {
     Want,
     #[serde(rename = "testing")]
     Testing,
+    #[serde(rename = "done")]
+    Done,
 }
 
 impl AppStatus {
@@ -69,6 +71,7 @@ impl AppStatus {
             AppStatus::Making => "#e040fb",  // Magenta - actively working
             AppStatus::Want => "#ffcc00",    // Yellow - planned/wanted
             AppStatus::Testing => "#7aebbe", // Cyan - beta testing
+            AppStatus::Done => "#4ecca3",    // Green - completed
         }
     }
 
@@ -77,6 +80,7 @@ impl AppStatus {
             AppStatus::Making => "Making",
             AppStatus::Want => "Want to Make",
             AppStatus::Testing => "Testing",
+            AppStatus::Done => "Done",
         }
     }
 }
@@ -90,6 +94,8 @@ pub struct AppProject {
     pub version: String,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
+    #[serde(default)]
+    pub archived: bool,
 }
 
 impl AppProject {
@@ -102,6 +108,7 @@ impl AppProject {
             version: "0.0.1-alpha.1".to_string(),
             created_at: Utc::now(),
             updated_at: Utc::now(),
+            archived: false,
         }
     }
 }

@@ -179,26 +179,38 @@ pub fn log_ollama_status(status: &OllamaStatus) {
 pub async fn ensure_ollama_running() {
     // First check if Ollama is installed
     if !is_ollama_installed() {
-        log::warn!("Ollama not installed, skipping auto-start");
+        log::warn!("🔴 Ollama not installed, skipping auto-start. Users should install from https://ollama.ai");
         return;
     }
     
+    log::info!("🔵 Checking if Ollama is running...");
+    
     // Check if already running
     if ping_ollama().await {
-        log::debug!("Ollama already running");
+        log::info!("✅ Ollama already running");
         return;
     }
     
     // Try to start it
-    log::info!("Ollama not running, attempting to start...");
+    log::info!("⏳ Ollama not running, attempting to start...");
     match start_ollama_service() {
         Ok(_) => {
-            log::info!("Started Ollama service");
-            // Give it time to fully boot
-            tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
+            log::info!("⏳ Ollama service started, waiting for readiness...");
+            // Give it time to fully boot with retries
+            for i in 0..6 {
+                tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
+                if ping_ollama().await {
+                    log::info!("✅ Ollama is now running and responding");
+                    return;
+                }
+                if i < 5 {
+                    log::debug!("⏳ Waiting for Ollama to be ready... ({}/6)", i + 1);
+                }
+            }
+            log::warn!("⚠️  Ollama started but not responding to pings yet");
         }
         Err(e) => {
-            log::warn!("Failed to start Ollama: {}", e);
+            log::error!("❌ Failed to start Ollama service: {}. Users may need to run 'ollama serve' manually.", e);
         }
     }
 }

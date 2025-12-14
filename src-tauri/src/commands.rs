@@ -370,3 +370,104 @@ pub async fn github_upload_asset(
         .map_err(|e| e.to_string())
 }
 
+
+// ============================================================================
+// Firebase Sync Commands
+// ============================================================================
+
+use crate::services::app_projects;
+
+/// Sync all projects with Firebase (bidirectional)
+#[tauri::command]
+pub async fn sync_projects(
+    id_token: String,
+    user_id: String,
+    db: State<'_, Mutex<Connection>>,
+) -> Result<usize, String> {
+    let conn = db.lock().map_err(|e| format!("Failed to lock database: {}", e))?;
+    
+    app_projects::sync_projects_with_firebase(&conn, &id_token, &user_id).await
+}
+
+/// Initialize app projects table
+#[tauri::command]
+pub fn init_app_projects(db: State<'_, Mutex<Connection>>) -> Result<(), String> {
+    let conn = db.lock().map_err(|e| format!("Failed to lock database: {}", e))?;
+    
+    app_projects::init_projects_table(&conn)
+        .map_err(|e| format!("Failed to init projects table: {}", e))
+}
+
+/// Save a project locally
+#[tauri::command]
+pub fn save_project(
+    project: crate::state::AppProject,
+    db: State<'_, Mutex<Connection>>,
+) -> Result<(), String> {
+    let conn = db.lock().map_err(|e| format!("Failed to lock database: {}", e))?;
+    
+    app_projects::save_project_local(&conn, &project)
+        .map_err(|e| format!("Failed to save project: {}", e))
+}
+
+/// Get all projects
+#[tauri::command]
+pub fn get_all_projects(db: State<'_, Mutex<Connection>>) -> Result<Vec<crate::state::AppProject>, String> {
+    let conn = db.lock().map_err(|e| format!("Failed to lock database: {}", e))?;
+    
+    app_projects::get_projects_local(&conn)
+        .map_err(|e| format!("Failed to get projects: {}", e))
+}
+
+/// Get active projects (not archived)
+#[tauri::command]
+pub fn get_active_projects(db: State<'_, Mutex<Connection>>) -> Result<Vec<crate::state::AppProject>, String> {
+    let conn = db.lock().map_err(|e| format!("Failed to lock database: {}", e))?;
+    
+    app_projects::get_active_projects(&conn)
+        .map_err(|e| format!("Failed to get active projects: {}", e))
+}
+
+/// Get archived projects
+#[tauri::command]
+pub fn get_archived_projects(db: State<'_, Mutex<Connection>>) -> Result<Vec<crate::state::AppProject>, String> {
+    let conn = db.lock().map_err(|e| format!("Failed to lock database: {}", e))?;
+    
+    app_projects::get_archived_projects(&conn)
+        .map_err(|e| format!("Failed to get archived projects: {}", e))
+}
+
+/// Archive or unarchive a project
+#[tauri::command]
+pub fn archive_project(
+    project_id: String,
+    archived: bool,
+    db: State<'_, Mutex<Connection>>,
+) -> Result<(), String> {
+    let conn = db.lock().map_err(|e| format!("Failed to lock database: {}", e))?;
+    
+    app_projects::toggle_archive(&conn, &project_id, archived)
+        .map_err(|e| format!("Failed to archive project: {}", e))
+}
+
+/// Delete a project from local database
+#[tauri::command]
+pub fn delete_project(
+    project_id: String,
+    db: State<'_, Mutex<Connection>>,
+) -> Result<(), String> {
+    let conn = db.lock().map_err(|e| format!("Failed to lock database: {}", e))?;
+    
+    app_projects::delete_project_local(&conn, &project_id)
+        .map_err(|e| format!("Failed to delete project: {}", e))
+}
+
+/// Delete a project from Firebase
+#[tauri::command]
+pub async fn delete_project_from_cloud(
+    id_token: String,
+    user_id: String,
+    project_id: String,
+) -> Result<(), String> {
+    app_projects::delete_project_from_firebase(&id_token, &user_id, &project_id).await
+}

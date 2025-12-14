@@ -2,6 +2,7 @@
 use crate::auth::AuthService;
 use crate::components::api_key_manager::ApiKeyManager;
 use crate::components::login::LoginPanel;
+use crate::llm::{self, LLMProvider, LLMRequest};
 use dioxus::prelude::*;
 
 #[derive(Clone, PartialEq, Debug)]
@@ -9,6 +10,81 @@ struct ProviderUIState {
     name: String,
     enabled: bool,
     api_key: String,
+}
+
+#[derive(Clone, PartialEq, Debug)]
+struct LocalModel {
+    name: String,
+}
+
+fn provider_by_name(name: &str) -> Option<LLMProvider> {
+    match name {
+        "Ollama (Local)" => Some(LLMProvider::Ollama),
+        "Mistral AI" => Some(LLMProvider::Mistral),
+        "Google Gemini" => Some(LLMProvider::Gemini),
+        "GitHub Copilot" => Some(LLMProvider::Copilot),
+        "GitHub Copilot CLI" => Some(LLMProvider::CopilotCLI),
+        "Office 365 AI" => Some(LLMProvider::Office365AI),
+        "Google One AI" => Some(LLMProvider::GoogleOneAI),
+        _ => None,
+    }
+}
+
+fn provider_requires_key(name: &str) -> bool {
+    matches!(
+        name,
+        "Mistral AI" | "Google Gemini" | "GitHub Copilot" | "Office 365 AI" | "Google One AI"
+    )
+}
+
+async fn fetch_local_models() -> Result<Vec<LocalModel>, String> {
+    use std::process::Command;
+    let output = Command::new("ollama")
+        .arg("list")
+        .output()
+        .map_err(|e| format!("ollama list failed: {}", e))?;
+
+    if !output.status.success() {
+        return Err(format!("ollama list exited with status {}", output.status));
+    }
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let mut models = Vec::new();
+    for line in stdout.lines().skip(1) {
+        // Expected format: NAME TAG SIZE ...
+        if let Some(first) = line.split_whitespace().next() {
+            models.push(LocalModel {
+                name: first.to_string(),
+            });
+        }
+    }
+    Ok(models)
+}
+
+async fn install_model(name: &str) -> Result<(), String> {
+    use std::process::Command;
+    let status = Command::new("ollama")
+        .args(["pull", name])
+        .status()
+        .map_err(|e| format!("ollama pull failed: {}", e))?;
+    if status.success() {
+        Ok(())
+    } else {
+        Err(format!("ollama pull exited with status {}", status))
+    }
+}
+
+async fn remove_model(name: &str) -> Result<(), String> {
+    use std::process::Command;
+    let status = Command::new("ollama")
+        .args(["rm", name])
+        .status()
+        .map_err(|e| format!("ollama rm failed: {}", e))?;
+    if status.success() {
+        Ok(())
+    } else {
+        Err(format!("ollama rm exited with status {}", status))
+    }
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -28,6 +104,7 @@ pub struct SettingsPanelProps {
 #[allow(non_snake_case)]
 #[allow(unreachable_code)]
 #[allow(dependency_on_unit_never_type_fallback)]
+#[allow(unknown_lints)]
 pub fn SettingsPanel(mut props: SettingsPanelProps) -> Element {
     let mut active_tab = use_signal(|| SettingsTab::Authentication);
     let mut providers = use_signal(|| {
@@ -70,6 +147,18 @@ pub fn SettingsPanel(mut props: SettingsPanelProps) -> Element {
         ]
     });
 
+    let mut save_status = use_signal(String::new);
+    let mut test_logs = use_signal(Vec::<String>::new);
+    let local_models = use_signal(Vec::<LocalModel>::new);
+    let mut hybrid_assist = use_signal(|| false);
+    let usage_counts = use_signal(|| std::collections::BTreeMap::<String, u64>::new());
+    let available_models = vec![
+        "llama3.1:8b".to_string(),
+        "mistral".to_string(),
+        "phi3".to_string(),
+        "qwen2:7b".to_string(),
+    ];
+
     let auth_signal = props.auth_service.clone();
 
     // Load provider keys from Firestore on mount (decrypts per user id_token)
@@ -91,6 +180,41 @@ pub fn SettingsPanel(mut props: SettingsPanelProps) -> Element {
     });
 
     let auth_signal_clone = auth_signal.clone();
+
+    // Load installed local models once
+    use_effect(move || {
+        let mut lm = local_models.clone();
+        spawn(async move {
+            match fetch_local_models().await {
+                Ok(list) => lm.set(list),
+                Err(e) => log::warn!("Failed to list local models: {}", e),
+            }
+        });
+    });
+
+    // Load hybrid assist toggle from cache
+    use_effect(move || {
+        let mut h = hybrid_assist.clone();
+        spawn(async move {
+            if let Ok(v) = std::fs::read_to_string("/tmp/kael_hybrid_assist.json") {
+                if v.trim() == "true" {
+                    h.set(true);
+                }
+            }
+        });
+    });
+
+    // Load provider usage counts once
+    {
+        let mut uc = usage_counts.clone();
+        use_effect(move || {
+            if let Ok(s) = std::fs::read_to_string("/tmp/kael_provider_usage.json") {
+                if let Ok(map) = serde_json::from_str::<std::collections::BTreeMap<String, u64>>(&s) {
+                    uc.set(map);
+                }
+            }
+        });
+    }
 
     rsx! {
         div {
@@ -203,16 +327,78 @@ pub fn SettingsPanel(mut props: SettingsPanelProps) -> Element {
 
                             h2 { style: "color: #e040fb; margin-bottom: 16px;", "Available Providers" }
 
-                            for provider in providers() {
-                                div {
+                            // Hybrid Assist toggle
+                            div { style: "display: flex; align-items: center; gap: 10px; margin-bottom: 12px;",
+                                input {
+                                    r#type: "checkbox",
+                                    checked: hybrid_assist(),
+                                    onchange: move |ev| {
+                                        let val = ev.checked();
+                                        hybrid_assist.set(val);
+                                        let _ = std::fs::write("/tmp/kael_hybrid_assist.json", if val { "true" } else { "false" });
+                                    }
+                                }
+                                span { style: "color: #f7f2ff; font-weight: 600;", "Hybrid Assist (local can delegate to cloud in your order)" }
+                            }
+
+                            // Refresh keys and save order controls
+                            div { style: "display: flex; gap: 8px; margin-bottom: 12px;",
+                                button { style: "padding: 8px 12px; border-radius: 8px; border: 1px solid #3a2d56; background: linear-gradient(135deg, #1f1631 0%, #181024 100%); color: #a99ec3; font-size: 12px;",
+                                    onclick: move |_| {
+                                        let auth = auth_signal_clone();
+                                        if let Some(user) = auth.get_user() {
+                                            let mut set_providers = providers.clone();
+                                            spawn(async move {
+                                                match crate::firebase::get_api_keys(&user).await {
+                                                    Ok(keys) => {
+                                                        let mut current = set_providers.write();
+                                                        for p in current.iter_mut() {
+                                                            if let Some(k) = keys.iter().find(|k| k.name == p.name) {
+                                                                p.api_key = k.value.clone();
+                                                            }
+                                                        }
+                                                        // update cache file
+                                                        let simple: Vec<serde_json::Value> = keys.into_iter().map(|k| serde_json::json!({"name": k.name, "value": k.value})).collect();
+                                                        let json = serde_json::to_string(&simple).unwrap_or_else(|_| "[]".to_string());
+                                                        let _ = std::fs::write("/tmp/kael_cached_keys.json", json);
+                                                        test_logs.write().push("🔄 Keys refreshed from Firebase".to_string());
+                                                    }
+                                                    Err(e) => {
+                                                        test_logs.write().push(format!("❌ Refresh failed: {}", e));
+                                                    }
+                                                }
+                                            });
+                                        } else {
+                                            test_logs.write().push("⚠️ Not authenticated".to_string());
+                                        }
+                                    },
+                                    "Refresh Keys"
+                                }
+                                button { style: "padding: 8px 12px; border-radius: 8px; border: 1px solid #3a2d56; background: linear-gradient(135deg, #1f1631 0%, #181024 100%); color: #a99ec3; font-size: 12px;",
+                                    onclick: move |_| {
+                                        // Persist enabled provider order
+                                        let order: Vec<serde_json::Value> = providers().iter().filter(|p| p.enabled).map(|p| serde_json::json!(p.name.clone())).collect();
+                                        let json = serde_json::to_string(&order).unwrap_or_else(|_| "[]".to_string());
+                                        let _ = std::fs::write("/tmp/kael_provider_order.json", json);
+                                        test_logs.write().push("💾 Provider order saved".to_string());
+                                    },
+                                    "Save Order"
+                                }
+                            }
+
+                                for provider in providers() {
+                                    div {
                                     key: "{provider.name}",
                                     style: "padding: 12px; margin-bottom: 12px; border-radius: 10px; border: 1px solid #3a2d56; background: rgba(58,42,80,0.25);",
 
                                     div {
                                         style: "display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;",
                                         div {
-                                            style: "color: #f7f2ff; font-weight: 600;",
+                                            style: "color: #f7f2ff; font-weight: 600; display: flex; align-items: center; gap: 8px;",
                                             "{provider.name}"
+                                            if let Some(count) = usage_counts().get(&provider.name) {
+                                                span { class: "chip", style: "color: #ffcc00;", "Last used: {count}" }
+                                            }
                                         }
                                         input {
                                             r#type: "checkbox",
@@ -226,6 +412,32 @@ pub fn SettingsPanel(mut props: SettingsPanelProps) -> Element {
                                                     }
                                                 }
                                             },
+                                        }
+                                    }
+                                        // Order controls (Up/Down)
+                                        button { style: "padding: 4px 8px; border-radius: 6px; border: 1px solid #3a2d56; background: #1f1631; color: #a99ec3; font-size: 12px; margin-left: 8px;",
+                                            onclick: {
+                                                let name = provider.name.clone();
+                                                move |_| {
+                                                    let mut list = providers.write();
+                                                    if let Some(pos) = list.iter().position(|x| x.name == name) {
+                                                        if pos > 0 { list.swap(pos, pos-1); }
+                                                    }
+                                                }
+                                            },
+                                            "Up"
+                                        }
+                                        button { style: "padding: 4px 8px; border-radius: 6px; border: 1px solid #3a2d56; background: #1f1631; color: #a99ec3; font-size: 12px; margin-left: 4px;",
+                                            onclick: {
+                                                let name = provider.name.clone();
+                                                move |_| {
+                                                    let mut list = providers.write();
+                                                    if let Some(pos) = list.iter().position(|x| x.name == name) {
+                                                        if pos + 1 < list.len() { list.swap(pos, pos+1); }
+                                                    }
+                                                }
+                                            },
+                                            "Down"
                                         }
                                     }
 
@@ -301,24 +513,68 @@ pub fn SettingsPanel(mut props: SettingsPanelProps) -> Element {
                                         }
                                     }
                                 }
-                            }
 
                             div { style: "display: flex; gap: 12px; padding-top: 16px; border-top: 1px solid #3a2d56;",
                                 button {
                                     style: "background: linear-gradient(135deg, #e040fb 0%, #ffcc00 55%, #7aebbe 100%); color: #120e1a; border: 1px solid #ffcc00; cursor: pointer; padding: 10px 18px; border-radius: 10px; box-shadow: 0 10px 22px #00000066; font-weight: 700;",
                                     onclick: move |_| {
+                                        save_status.set("Saving & testing providers...".to_string());
+                                        test_logs.set(Vec::new());
+
                                         let auth = auth_signal_clone();
                                         if let Some(user) = auth.get_user() {
                                             let snapshot = providers.read().clone();
+                                            let mut status_signal = save_status.clone();
+                                            let mut logs_signal = test_logs.clone();
                                             spawn(async move {
+                                                let mut logs: Vec<String> = Vec::new();
+
                                                 for p in snapshot.iter() {
                                                     // Persist only if key is non-empty
                                                     if !p.api_key.is_empty() {
                                                         let _ = crate::firebase::save_api_key(&user, &p.name, &p.api_key).await;
                                                     }
                                                 }
+
+                                                for p in snapshot.iter() {
+                                                    let Some(provider) = provider_by_name(&p.name) else {
+                                                        logs.push(format!("Skipped unknown provider: {}", p.name));
+                                                        continue;
+                                                    };
+
+                                                    if !p.enabled {
+                                                        logs.push(format!("⏸️ {} disabled; skipped test", p.name));
+                                                        continue;
+                                                    }
+
+                                                    if provider_requires_key(&p.name) && p.api_key.is_empty() {
+                                                        logs.push(format!("⚠️ {} missing API key; skipped test", p.name));
+                                                        continue;
+                                                    }
+
+                                                    let req = LLMRequest {
+                                                        provider: provider.clone(),
+                                                        model: String::new(),
+                                                        prompt: "ping".to_string(),
+                                                        api_key: if provider_requires_key(&p.name) {
+                                                            Some(p.api_key.clone())
+                                                        } else {
+                                                            None
+                                                        },
+                                                        system: Some("You are a quick connectivity probe. Reply with 'ok'.".to_string()),
+                                                    };
+
+                                                    match llm::send_request_with_fallback(req, Some(&user), vec![]).await {
+                                                        Ok(res) => logs.push(format!("✅ {} responding via {:?}", p.name, res.provider)),
+                                                        Err(e) => logs.push(format!("❌ {} failed: {}", p.name, e)),
+                                                    }
+                                                }
+
+                                                logs_signal.set(logs);
+                                                status_signal.set("Saved & tested providers".to_string());
                                             });
                                         } else {
+                                            save_status.set("Sign in to save and test providers".to_string());
                                             log::warn!("Cannot save provider keys: not authenticated");
                                         }
                                     },
@@ -353,6 +609,119 @@ pub fn SettingsPanel(mut props: SettingsPanelProps) -> Element {
                                         log::info!("Provider settings reset to defaults");
                                     },
                                     "Reset to Defaults"
+                                }
+
+                                if !save_status().is_empty() {
+                                    div { style: "margin-top: 12px; color: #a99ec3; font-size: 13px;",
+                                        "Status: {save_status()}"
+                                    }
+                                }
+
+                                if !test_logs().is_empty() {
+                                    div { style: "margin-top: 8px; padding: 10px; border: 1px solid #3a2d56; border-radius: 10px; background: rgba(58,42,80,0.18); color: #f7f2ff; font-size: 13px; display: flex; flex-direction: column; gap: 6px;",
+                                        for log_line in test_logs() {
+                                            span { "{log_line}" }
+                                        }
+                                    }
+                                }
+                            }
+
+                            div { style: "margin-top: 20px; border-top: 1px solid #3a2d56; padding-top: 16px;", 
+                                h3 { style: "color: #e040fb; margin-bottom: 12px;", "Local AI Models (Ollama)" }
+
+                                if !local_models().is_empty() {
+                                    div { style: "display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px;",
+                                        for m in local_models() {
+                                            div { style: "display: flex; align-items: center; justify-content: space-between; padding: 8px 10px; border: 1px solid #3a2d56; border-radius: 8px; background: rgba(58,42,80,0.2);",
+                                                span { style: "color: #f7f2ff;", "{m.name}" }
+                                                button {
+                                                    style: "padding: 6px 10px; border-radius: 6px; border: 1px solid #ff6b6b; color: #ff6b6b; background: transparent; cursor: pointer;",
+                                                    onclick: {
+                                                        let name = m.name.clone();
+                                                        let mut lm = local_models.clone();
+                                                        move |_| {
+                                                            let name2 = name.clone();
+                                                            spawn(async move {
+                                                                match remove_model(&name2).await {
+                                                                    Ok(_) => {
+                                                                        log::info!("Removed model {}", name2);
+                                                                        if let Ok(list) = fetch_local_models().await {
+                                                                            lm.set(list);
+                                                                        }
+                                                                    }
+                                                                    Err(e) => log::error!("Remove model {} failed: {}", name2, e),
+                                                                }
+                                                            });
+                                                        }
+                                                    },
+                                                    "Remove"
+                                                }
+                                            }
+                                        }
+                                    }
+                                } else {
+                                    p { style: "color: #a99ec3; font-size: 13px; margin-bottom: 12px;", "No local models installed. Install one below." }
+                                }
+
+                                // Refresh Local Models list
+                                div { style: "display: flex; gap: 8px; margin-bottom: 10px;",
+                                    button { style: "padding: 6px 10px; border-radius: 6px; border: 1px solid #3a2d56; background: #1f1631; color: #a99ec3; font-size: 12px;",
+                                        onclick: {
+                                            let mut lm = local_models.clone();
+                                            move |_| {
+                                                spawn(async move {
+                                                    match fetch_local_models().await {
+                                                        Ok(list) => {
+                                                            // Update UI
+                                                            lm.set(list.clone());
+                                                            // Write cache for runtime selection
+                                                            let names: Vec<String> = list.into_iter().map(|m| m.name).collect();
+                                                            let json = serde_json::to_string(&names).unwrap_or_else(|_| "[]".to_string());
+                                                            let _ = std::fs::write("/tmp/kael_local_models.json", json);
+                                                            log::info!("Cached local models to /tmp/kael_local_models.json");
+                                                        },
+                                                        Err(e) => log::warn!("Failed to list local models: {}", e),
+                                                    }
+                                                });
+                                            }
+                                        },
+                                        "Refresh Local Models"
+                                    }
+                                }
+
+                                div { style: "display: flex; flex-direction: column; gap: 8px;",
+                                    for model in available_models.clone() {
+                                        div { style: "display: flex; align-items: center; justify-content: space-between; padding: 8px 10px; border: 1px solid #3a2d56; border-radius: 8px; background: rgba(58,42,80,0.12);",
+                                            span { style: "color: #f7f2ff;", "{model}" }
+                                            button {
+                                                style: if local_models().iter().any(|m| m.name == model) {
+                                                    "padding: 6px 12px; border-radius: 6px; border: 1px solid #3a2d56; color: #a99ec3; background: transparent; cursor: not-allowed;"
+                                                } else {
+                                                    "padding: 6px 12px; border-radius: 6px; border: 1px solid #7aebbe; color: #120e1a; background: linear-gradient(135deg, #7aebbe 0%, #5af0c8 100%); cursor: pointer;"
+                                                },
+                                                disabled: local_models().iter().any(|m| m.name == model),
+                                                onclick: {
+                                                    let model_name = model.clone();
+                                                    let mut lm = local_models.clone();
+                                                    move |_| {
+                                                        let model2 = model_name.clone();
+                                                        spawn(async move {
+                                                            match install_model(&model2).await {
+                                                                Ok(_) => {
+                                                                    log::info!("Installed model {}", model2);
+                                                                    if let Ok(list) = fetch_local_models().await {
+                                                                        lm.set(list);
+                                                                    }
+                                                                }
+                                                                Err(e) => log::error!("Install model {} failed: {}", model2, e),
+                                                            }
+                                                        });
+                                                    }
+                                                },
+                                                if local_models().iter().any(|m| m.name == model) { "Installed" } else { "Install" }
+                                            }
+                                        }
+                                    }
                                 }
                             }
                         }

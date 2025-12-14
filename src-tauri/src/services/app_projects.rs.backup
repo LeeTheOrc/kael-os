@@ -1,0 +1,206 @@
+//! App Projects Service
+//! Handles Firebase sync and local database persistence for app projects
+
+use crate::state::{AppProject, AppStatus};
+use rusqlite::Connection;
+use serde_json::json;
+
+const PROJECTS_TABLE: &str = r#"
+    CREATE TABLE IF NOT EXISTS app_projects (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        description TEXT NOT NULL,
+        status TEXT NOT NULL,
+        version TEXT NOT NULL,
+        archived INTEGER NOT NULL DEFAULT 0,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        synced INTEGER NOT NULL DEFAULT 0,
+        firebase_synced_at TEXT
+    )
+"#;
+
+/// Initialize app projects table in local database
+pub fn init_projects_table(conn: &Connection) -> rusqlite::Result<()> {
+    conn.execute(PROJECTS_TABLE, [])?;
+    Ok(())
+}
+
+/// Save a project to local database
+pub fn save_project_local(conn: &Connection, project: &AppProject) -> rusqlite::Result<()> {
+    let status_str = match project.status {
+        AppStatus::Making => "making",
+        AppStatus::Want => "want",
+        AppStatus::Testing => "testing",
+        AppStatus::Done => "done",
+    };
+
+    conn.execute(
+        "INSERT OR REPLACE INTO app_projects 
+        (id, name, description, status, version, archived, created_at, updated_at, synced)
+        VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, 0)",
+        rusqlite::params![
+            &project.id,
+            &project.name,
+            &project.description,
+            status_str,
+            &project.version,
+            if project.archived { 1 } else { 0 },
+            project.created_at.to_rfc3339(),
+            project.updated_at.to_rfc3339(),
+        ],
+    )?;
+    Ok(())
+}
+
+/// Get all projects from local database
+pub fn get_projects_local(conn: &Connection) -> rusqlite::Result<Vec<AppProject>> {
+    let mut stmt = conn.prepare(
+        "SELECT id, name, description, status, version, archived, created_at, updated_at 
+         FROM app_projects ORDER BY updated_at DESC",
+    )?;
+
+    let projects = stmt.query_map([], |row| {
+        let status_str: String = row.get(3)?;
+        let status = match status_str.as_str() {
+            "making" => AppStatus::Making,
+            "testing" => AppStatus::Testing,
+            "done" => AppStatus::Done,
+            _ => AppStatus::Want,
+        };
+
+        Ok(AppProject {
+            id: row.get(0)?,
+            name: row.get(1)?,
+            description: row.get(2)?,
+            status,
+            version: row.get(4)?,
+            archived: row.get::<_, i32>(5)? != 0,
+            created_at: row.get::<_, String>(6)?.parse().unwrap_or_else(|_| chrono::Utc::now()),
+            updated_at: row.get::<_, String>(7)?.parse().unwrap_or_else(|_| chrono::Utc::now()),
+        })
+    })?;
+
+    let mut result = Vec::new();
+    for project in projects {
+        result.push(project?);
+    }
+    Ok(result)
+}
+
+/// Get active projects (not archived)
+pub fn get_active_projects(conn: &Connection) -> rusqlite::Result<Vec<AppProject>> {
+    let mut stmt = conn.prepare(
+        "SELECT id, name, description, status, version, archived, created_at, updated_at 
+         FROM app_projects WHERE archived = 0 ORDER BY updated_at DESC",
+    )?;
+
+    let projects = stmt.query_map([], |row| {
+        let status_str: String = row.get(3)?;
+        let status = match status_str.as_str() {
+            "making" => AppStatus::Making,
+            "testing" => AppStatus::Testing,
+            "done" => AppStatus::Done,
+            _ => AppStatus::Want,
+        };
+
+        Ok(AppProject {
+            id: row.get(0)?,
+            name: row.get(1)?,
+            description: row.get(2)?,
+            status,
+            version: row.get(4)?,
+            archived: row.get::<_, i32>(5)? != 0,
+            created_at: row.get::<_, String>(6)?.parse().unwrap_or_else(|_| chrono::Utc::now()),
+            updated_at: row.get::<_, String>(7)?.parse().unwrap_or_else(|_| chrono::Utc::now()),
+        })
+    })?;
+
+    let mut result = Vec::new();
+    for project in projects {
+        result.push(project?);
+    }
+    Ok(result)
+}
+
+/// Get archived projects
+pub fn get_archived_projects(conn: &Connection) -> rusqlite::Result<Vec<AppProject>> {
+    let mut stmt = conn.prepare(
+        "SELECT id, name, description, status, version, archived, created_at, updated_at 
+         FROM app_projects WHERE archived = 1 ORDER BY updated_at DESC",
+    )?;
+
+    let projects = stmt.query_map([], |row| {
+        let status_str: String = row.get(3)?;
+        let status = match status_str.as_str() {
+            "making" => AppStatus::Making,
+            "testing" => AppStatus::Testing,
+            "done" => AppStatus::Done,
+            _ => AppStatus::Want,
+        };
+
+        Ok(AppProject {
+            id: row.get(0)?,
+            name: row.get(1)?,
+            description: row.get(2)?,
+            status,
+            version: row.get(4)?,
+            archived: row.get::<_, i32>(5)? != 0,
+            created_at: row.get::<_, String>(6)?.parse().unwrap_or_else(|_| chrono::Utc::now()),
+            updated_at: row.get::<_, String>(7)?.parse().unwrap_or_else(|_| chrono::Utc::now()),
+        })
+    })?;
+
+    let mut result = Vec::new();
+    for project in projects {
+        result.push(project?);
+    }
+    Ok(result)
+}
+
+/// Archive/unarchive a project
+pub fn toggle_archive(conn: &Connection, project_id: &str, archived: bool) -> rusqlite::Result<()> {
+    conn.execute(
+        "UPDATE app_projects SET archived = ?, updated_at = ? WHERE id = ?",
+        rusqlite::params![if archived { 1 } else { 0 }, chrono::Utc::now().to_rfc3339(), project_id],
+    )?;
+    Ok(())
+}
+
+/// Delete a project from local database
+pub fn delete_project_local(conn: &Connection, project_id: &str) -> rusqlite::Result<()> {
+    conn.execute("DELETE FROM app_projects WHERE id = ?", rusqlite::params![project_id])?;
+    Ok(())
+}
+
+/// Prepare project data for Firebase sync
+pub fn project_to_firebase_doc(project: &AppProject) -> serde_json::Value {
+    json!({
+        "fields": {
+            "id": { "stringValue": project.id },
+            "name": { "stringValue": project.name },
+            "description": { "stringValue": project.description },
+            "status": { "stringValue": match project.status {
+                AppStatus::Making => "making",
+                AppStatus::Want => "want",
+                AppStatus::Testing => "testing",
+                AppStatus::Done => "done",
+            }},
+            "version": { "stringValue": project.version },
+            "archived": { "booleanValue": project.archived },
+            "created_at": { "stringValue": project.created_at.to_rfc3339() },
+            "updated_at": { "stringValue": project.updated_at.to_rfc3339() },
+        }
+    })
+}
+
+/// Mark projects as synced in local database
+pub fn mark_synced(conn: &Connection, project_ids: &[String]) -> rusqlite::Result<()> {
+    for id in project_ids {
+        conn.execute(
+            "UPDATE app_projects SET synced = 1, firebase_synced_at = ? WHERE id = ?",
+            rusqlite::params![chrono::Utc::now().to_rfc3339(), id],
+        )?;
+    }
+    Ok(())
+}

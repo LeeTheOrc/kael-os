@@ -5,7 +5,7 @@ use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub enum LLMProvider {
     Ollama,
     Mistral,
@@ -34,7 +34,22 @@ pub struct LLMResponse {
 fn default_model_for(provider: &LLMProvider) -> String {
     match provider {
         LLMProvider::Ollama => {
-            std::env::var("OLLAMA_MODEL").unwrap_or_else(|_| "mistral".to_string())
+            // Use only two locals by preference: llama:latest then phi3
+            if let Ok(json) = std::fs::read_to_string("/tmp/kael_local_models.json") {
+                if let Ok(list) = serde_json::from_str::<Vec<String>>(&json) {
+                    if list.iter().any(|n| n == "llama:latest") {
+                        return "llama:latest".to_string();
+                    }
+                    if list.iter().any(|n| n.to_lowercase().starts_with("phi3")) {
+                        return list
+                            .into_iter()
+                            .find(|n| n.to_lowercase().starts_with("phi3"))
+                            .unwrap_or_else(|| "phi3".to_string());
+                    }
+                }
+            }
+            // Fallback: prefer llama:latest if env not set
+            std::env::var("OLLAMA_MODEL").unwrap_or_else(|_| "llama:latest".to_string())
         }
         LLMProvider::Mistral => {
             std::env::var("MISTRAL_MODEL").unwrap_or_else(|_| "mistral-small".to_string())
@@ -128,6 +143,35 @@ async fn send_request_single(
     mut request: LLMRequest,
     user: Option<&User>,
 ) -> Result<LLMResponse, String> {
+    // Try local cached keys first to avoid initial network delay
+    if request.api_key.is_none() {
+        let provider_name = match request.provider {
+            LLMProvider::Mistral => "Mistral AI",
+            LLMProvider::Gemini => "Google Gemini",
+            LLMProvider::Copilot => "GitHub Copilot",
+            LLMProvider::CopilotCLI => "GitHub Copilot CLI",
+            LLMProvider::Office365AI => "Office 365 AI",
+            LLMProvider::GoogleOneAI => "Google One AI",
+            _ => "",
+        };
+        if !provider_name.is_empty() {
+            if let Ok(json) = std::fs::read_to_string("/tmp/kael_cached_keys.json") {
+                if let Ok(list) = serde_json::from_str::<Vec<serde_json::Value>>(&json) {
+                    if let Some(val) = list.iter().find_map(|v| {
+                        let name = v.get("name").and_then(|x| x.as_str());
+                        let value = v.get("value").and_then(|x| x.as_str());
+                        match (name, value) {
+                            (Some(n), Some(v)) if n == provider_name => Some(v.to_string()),
+                            _ => None,
+                        }
+                    }) {
+                        request.api_key = Some(val);
+                    }
+                }
+            }
+        }
+    }
+
     if let Some(user) = user {
         if request.api_key.is_none() {
             let provider_name = match request.provider {
@@ -175,8 +219,8 @@ async fn send_request_single(
                 stream: false,
             };
 
-            match client.post(url).json(&body).send().await {
-                Ok(resp) => {
+            match tokio::time::timeout(Duration::from_secs(15), client.post(url).json(&body).send()).await {
+                Ok(Ok(resp)) => {
                     if resp.status().is_success() {
                         match resp.json::<OllamaGenerateResp>().await {
                             Ok(parsed) => Ok(LLMResponse {
@@ -191,7 +235,8 @@ async fn send_request_single(
                         Err(format!("Ollama unavailable ({}): {}", status, text))
                     }
                 }
-                Err(e) => Err(format!("Ollama connection failed: {}", e)),
+                Ok(Err(e)) => Err(format!("Ollama connection failed: {}", e)),
+                Err(_) => Err("Ollama request timed out (15s)".to_string()),
             }
         }
         LLMProvider::Mistral => {

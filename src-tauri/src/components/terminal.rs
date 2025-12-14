@@ -10,6 +10,7 @@ pub struct TerminalProps {
 
 #[allow(non_snake_case)]
 pub fn TerminalPanel(props: TerminalProps) -> Element {
+    let mut pending_cmd = use_signal(String::new);
     rsx! {
         div {
             class: "flex flex-col gap-3",
@@ -26,6 +27,13 @@ pub fn TerminalPanel(props: TerminalProps) -> Element {
                 div { style: "height: 32px; display: flex; align-items: center; gap: 8px; padding: 0 12px; background: linear-gradient(120deg, #1f1631 0%, #181024 80%, #120b1f 100%); color: #7aebbe; font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em; border: 1px solid #3a2d56; border-radius: 8px;",
                     SparkIcon { class: "w-3 h-3" }
                     span { "Shell" }
+                    // Shortcut: gh auth login
+                    button { style: "margin-left: auto; padding: 4px 8px; border-radius: 6px; border: 1px solid #7aebbe; color: #120e1a; background: linear-gradient(135deg, #7aebbe 0%, #5af0c8 100%); font-size: 12px;",
+                        onclick: move |_| {
+                            pending_cmd.set("gh auth login".to_string());
+                        },
+                        "gh auth login"
+                    }
                 }
                 // Output area
                 pre { style: "margin: 12px 0 0; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace; background: linear-gradient(180deg, #181024 0%, #120b1f 100%); padding: 10px; max-height: 260px; overflow-y: auto; border: 1px solid #3a2d56; border-radius: 10px;", "{props.term_out}" }

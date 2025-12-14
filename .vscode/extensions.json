@@ -2,8 +2,12 @@
   "recommendations": [
     "rust-lang.rust-analyzer",
     "tauri-apps.tauri-vscode",
-    "bradlc.vscode-tailwindcss",
-    "dbaeumer.vscode-eslint",
-    "esbenp.prettier-vscode"
+    "vadimcn.vscode-lldb",
+    "tamasfe.even-better-toml",
+    "firebase.vscode-firebase-explorer",
+    "googlecloudtools.cloudcode",
+    "github.vscode-pull-request-github",
+    "github.copilot",
+    "github.copilot-chat"
   ]
 }

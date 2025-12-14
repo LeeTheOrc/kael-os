@@ -23,10 +23,27 @@ pub fn ApiKeyManager(props: ApiKeyManagerProps) -> Element {
     use_effect(move || {
         if let Some(user) = user_signal().clone() {
             let mut api_keys = api_keys;
+            let mut error_msg = error_message.clone();
             spawn(async move {
                 match firebase::get_api_keys(&user).await {
-                    Ok(keys) => api_keys.set(keys),
-                    Err(e) => error_message.set(e),
+                    Ok(keys) => {
+                        // Cache keys locally as fallback
+                        if let Ok(json) = serde_json::to_string(&keys) {
+                            let _ = std::fs::write("/tmp/kael_cached_api_keys.json", json);
+                        }
+                        api_keys.set(keys);
+                    }
+                    Err(e) => {
+                        // Try to load from local cache if Firebase fails
+                        if let Ok(cached) = std::fs::read_to_string("/tmp/kael_cached_api_keys.json") {
+                            if let Ok(keys) = serde_json::from_str::<Vec<firebase::ApiKey>>(&cached) {
+                                log::warn!("Firebase unavailable, using cached keys");
+                                api_keys.set(keys);
+                                return;
+                            }
+                        }
+                        error_msg.set(format!("Failed to load keys: {}", e));
+                    }
                 }
             });
         }
