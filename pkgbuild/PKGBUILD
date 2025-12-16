@@ -1,0 +1,17 @@
+pkgname=kael-os
+pkgver=0.2.0
+pkgrel=1
+pkgdesc="Kael-OS Desktop Application"
+arch=(x86_64)
+url="https://kael.leroyonline.co.za/"
+license=('custom')
+depends=(glibc)
+provides=(kael-os)
+conflicts=(kael-os-git)
+source=("kael-os-$pkgver-x86_64.tar.gz::https://leroyonline.co.za/kael/downloads/desktop/kael-os-$pkgver-x86_64.tar.gz")
+sha256sums=('SKIP')
+
+package() {
+  install -d "$pkgdir/usr/bin"
+  install -Dm755 kael-os "$pkgdir/usr/bin/kael-os"
+}

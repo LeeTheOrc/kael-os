@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Documentation - Kael-OS</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="container">
+            <div class="nav-brand">Kael-OS</div>
+            <ul class="nav-links">
+                <li><a href="index.html">Home</a></li>
+                <li><a href="index.html#features">Features</a></li>
+                <li><a href="download.html">Download</a></li>
+                <li><a href="docs.html">Docs</a></li>
+                <li><a href="about.html">About</a></li>
+                <li><a href="https://github.com/leetheorc/Kael-OS-AI" target="_blank">GitHub</a></li>
+            </ul>
+        </div>
+    </nav>
+
+    <section class="docs-hero">
+        <div class="container">
+            <h1>Documentation</h1>
+            <p class="hero-subtitle">Everything you need to know about Kael-OS</p>
+        </div>
+    </section>
+
+    <div class="docs-container">
+        <h2 style="margin-bottom: 2rem;">Getting Started</h2>
+        <div class="docs-grid">
+            <a href="#installation" class="docs-card">
+                <div class="docs-card-icon">📦</div>
+                <h3>Installation</h3>
+                <p>Step-by-step guide to install Kael-OS on Arch Linux and other distributions</p>
+            </a>
+            <a href="#quick-start" class="docs-card">
+                <div class="docs-card-icon">🚀</div>
+                <h3>Quick Start</h3>
+                <p>Get up and running with Kael-OS in minutes</p>
+            </a>
+            <a href="#configuration" class="docs-card">
+                <div class="docs-card-icon">⚙️</div>
+                <h3>Configuration</h3>
+                <p>Configure AI models, providers, and system settings</p>
+            </a>
+        </div>
+
+        <section id="installation" class="about-section">
+            <h2>Installation</h2>
+            
+            <h3 style="margin-top: 1.5rem; margin-bottom: 1rem;">Arch Linux (Recommended)</h3>
+            <div class="code-block">
+                <code># Quick install with auto-installer
+curl -sSL https://kael-os.dev/install.sh | bash
+
+# Or install from AUR
+paru -S kael-os-ai
+# or
+yay -S kael-os-ai</code>
+            </div>
+
+            <h3 style="margin-top: 1.5rem; margin-bottom: 1rem;">Other Linux Distributions</h3>
+            <div class="code-block">
+                <code># Download latest release
+wget https://github.com/leetheorc/Kael-OS-AI/releases/latest/download/kael-os-linux.tar.gz
+
+# Extract and install
+tar -xzf kael-os-linux.tar.gz
+cd kael-os
+sudo ./install.sh</code>
+            </div>
+
+            <h3 style="margin-top: 1.5rem; margin-bottom: 1rem;">Build from Source</h3>
+            <div class="code-block">
+                <code># Clone repository
+git clone https://github.com/leetheorc/Kael-OS-AI.git
+cd Kael-OS-AI
+
+# Install dependencies
+./scripts/install-all.sh
+
+# Build
+cargo build --release --manifest-path Kael-OS-AI/src-tauri/Cargo.toml</code>
+            </div>
+        </section>
+
+        <section id="quick-start" class="about-section">
+            <h2>Quick Start</h2>
+            <p>After installation, follow these steps to get started:</p>
+            
+            <div class="install-steps">
+                <ol>
+                    <li><strong>Install Ollama:</strong> Kael-OS uses Ollama for local AI models
+                        <div class="code-block">
+                            <code>curl -fsSL https://ollama.com/install.sh | sh</code>
+                        </div>
+                    </li>
+                    <li><strong>Download a model:</strong> Choose a model that fits your hardware
+                        <div class="code-block">
+                            <code>ollama pull llama2
+# or for better performance on modern hardware
+ollama pull mistral</code>
+                        </div>
+                    </li>
+                    <li><strong>Launch Kael-OS:</strong> Start the application
+                        <div class="code-block">
+                            <code>kael-os</code>
+                        </div>
+                    </li>
+                    <li><strong>Configure settings:</strong> Open Settings to configure your AI provider and model preferences</li>
+                    <li><strong>Start chatting:</strong> You're ready to use local AI!</li>
+                </ol>
+            </div>
+        </section>
+
+        <section id="configuration" class="about-section">
+            <h2>Configuration</h2>
+            <p>Kael-OS can be configured through the Settings panel or by editing configuration files directly.</p>
+            
+            <h3 style="margin-top: 1.5rem; margin-bottom: 1rem;">AI Provider Settings</h3>
+            <p style="color: var(--text-secondary); margin-bottom: 1rem;">
+                Configure which AI provider to use (Ollama, OpenAI API, etc.) and set your preferred models.
+            </p>
+
+            <h3 style="margin-top: 1.5rem; margin-bottom: 1rem;">GPU Acceleration</h3>
+            <p style="color: var(--text-secondary); margin-bottom: 1rem;">
+                Kael-OS automatically detects and uses GPU acceleration when available. Configure GPU settings in the Performance section.
+            </p>
+
+            <h3 style="margin-top: 1.5rem; margin-bottom: 1rem;">Keyboard Shortcuts</h3>
+            <div class="code-block">
+                <code>Ctrl+N     - New chat
+Ctrl+,     - Open settings
+Ctrl+K     - Focus search
+Ctrl+Q     - Quit application</code>
+            </div>
+        </section>
+
+        <div class="api-section">
+            <h3>API Reference</h3>
+            <p style="color: var(--text-secondary); margin-bottom: 1.5rem;">
+                Detailed API documentation for developers building on top of Kael-OS
+            </p>
+            <ul class="api-list">
+                <li>
+                    <a href="https://github.com/leetheorc/Kael-OS-AI/blob/main/docs/dev/API.md" target="_blank">
+                        <span>Core API Documentation</span>
+                        <span>→</span>
+                    </a>
+                </li>
+                <li>
+                    <a href="https://github.com/leetheorc/Kael-OS-AI/blob/main/docs/dev/TAURI_COMMANDS.md" target="_blank">
+                        <span>Tauri Commands</span>
+                        <span>→</span>
+                    </a>
+                </li>
+                <li>
+                    <a href="https://github.com/leetheorc/Kael-OS-AI/blob/main/docs/dev/RUST_SERVICES.md" target="_blank">
+                        <span>Rust Services</span>
+                        <span>→</span>
+                    </a>
+                </li>
+                <li>
+                    <a href="https://github.com/leetheorc/Kael-OS-AI/blob/main/docs/dev/PLUGIN_SYSTEM.md" target="_blank">
+                        <span>Plugin System</span>
+                        <span>→</span>
+                    </a>
+                </li>
+            </ul>
+        </div>
+
+        <div class="about-section">
+            <h2>Need Help?</h2>
+            <p>
+                Can't find what you're looking for? Join our community on 
+                <a href="https://discord.gg/9mRjPxpShW" target="_blank" style="color: var(--accent-purple);">Discord</a> 
+                or check out the 
+                <a href="https://github.com/leetheorc/Kael-OS-AI/discussions" target="_blank" style="color: var(--accent-purple);">GitHub Discussions</a>.
+            </p>
+        </div>
+    </div>
+
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-section">
+                    <h4>Kael-OS</h4>
+                    <p>Local-first AI for Arch Linux</p>
+                </div>
+                <div class="footer-section">
+                    <h4>Resources</h4>
+                    <ul>
+                        <li><a href="docs.html">Documentation</a></li>
+                        <li><a href="download.html">Download</a></li>
+                        <li><a href="about.html">About</a></li>
+                    </ul>
+                </div>
+                <div class="footer-section">
+                    <h4>Community</h4>
+                    <ul>
+                        <li><a href="https://github.com/leetheorc/Kael-OS-AI" target="_blank">GitHub</a></li>
+                        <li><a href="https://discord.gg/9mRjPxpShW" target="_blank">Discord</a></li>
+                        <li><a href="https://github.com/leetheorc/Kael-OS-AI/discussions" target="_blank">Discussions</a></li>
+                    </ul>
+                </div>
+                <div class="footer-section">
+                    <h4>Legal</h4>
+                    <ul>
+                        <li><a href="https://github.com/leetheorc/Kael-OS-AI/blob/main/LICENSE" target="_blank">MIT License</a></li>
+                        <li><a href="#privacy">Privacy Policy</a></li>
+                    </ul>
+                </div>
+            </div>
+            <div class="footer-bottom">
+                <p>&copy; 2025 Kael-OS. Open source under MIT License.</p>
+            </div>
+        </div>
+    </footer>
+
+    <script src="script.js"></script>
+</body>
+</html>

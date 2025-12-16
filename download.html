@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Download - Kael-OS</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="container">
+            <div class="nav-brand">Kael-OS</div>
+            <ul class="nav-links">
+                <li><a href="index.html">Home</a></li>
+                <li><a href="index.html#features">Features</a></li>
+                <li><a href="download.html">Download</a></li>
+                <li><a href="docs.html">Docs</a></li>
+                <li><a href="about.html">About</a></li>
+                <li><a href="https://github.com/leetheorc/Kael-OS-AI" target="_blank">GitHub</a></li>
+            </ul>
+        </div>
+    </nav>
+
+    <section class="download-hero">
+        <div class="container">
+            <h1>Download Kael-OS</h1>
+            <p class="hero-subtitle">Choose your platform and get started with local AI</p>
+        </div>
+    </section>
+
+    <div class="download-main">
+        <div class="container">
+            <!-- Arch Linux Section -->
+            <div class="platform-section">
+                <h2>🏔️ Arch Linux (Recommended)</h2>
+                <p style="color: var(--text-secondary); margin-bottom: 2rem;">
+                    Kael-OS is optimized for Arch Linux with native packaging and automatic updates
+                </p>
+
+                <div class="install-steps">
+                    <h3 style="margin-bottom: 1rem;">Quick Install</h3>
+                    <div class="code-block">
+                        <code>curl -sSL https://kael-os.dev/install.sh | bash</code>
+                    </div>
+
+                    <h3 style="margin-top: 2rem; margin-bottom: 1rem;">Install from AUR</h3>
+                    <div class="code-block">
+                        <code># Using paru
+paru -S kael-os-ai
+
+# Using yay
+yay -S kael-os-ai
+
+# Manual installation
+git clone https://aur.archlinux.org/kael-os-ai.git
+cd kael-os-ai
+makepkg -si</code>
+                    </div>
+
+                    <h3 style="margin-top: 2rem; margin-bottom: 1rem;">Direct Package Download</h3>
+                    <div style="display: flex; gap: 1rem; margin-top: 1rem; flex-wrap: wrap;">
+                        <a href="https://leroyonline.co.za/kael/downloads/desktop/kael-os-1.0.0-x86_64.tar.gz" class="btn btn-primary" download>
+                            Download .tar.gz (7.0 MB)
+                        </a>
+                        <a href="pkgbuild/PKGBUILD" class="btn btn-secondary" download>
+                            Download PKGBUILD
+                        </a>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Generic Linux Section -->
+            <div class="platform-section">
+                <h2>🐧 Other Linux Distributions</h2>
+                <p style="color: var(--text-secondary); margin-bottom: 2rem;">
+                    For Debian, Ubuntu, Fedora, and other distributions
+                </p>
+
+                <div class="install-steps">
+                    <h3 style="margin-bottom: 1rem;">Installation Steps</h3>
+                    <ol>
+                        <li>Download the latest release tarball</li>
+                        <li>Extract and install dependencies</li>
+                        <li>Run the application</li>
+                    </ol>
+
+                    <div class="code-block" style="margin-top: 1rem;">
+                        <code># Download latest release
+wget https://leroyonline.co.za/kael/downloads/desktop/kael-os-1.0.0-x86_64.tar.gz
+
+# Verify checksum
+echo "e4988341e7978657d9a9fb528ef33635db673b00055af1d0d31efc11c0a524cf  kael-os-1.0.0-x86_64.tar.gz" | sha256sum -c
+
+# Extract
+tar -xzf kael-os-1.0.0-x86_64.tar.gz
+cd kael-os-1.0.0-x86_64
+
+# Install (copies to /usr/bin and creates desktop entry)
+sudo ./install.sh
+
+# Or manually
+sudo cp bin/kael-os /usr/bin/
+sudo cp share/applications/kael-os.desktop /usr/share/applications/
+sudo cp share/icons/hicolor/512x512/apps/kael-os.png /usr/share/icons/hicolor/512x512/apps/
+
+# Run
+kael-os</code>
+                    </div>
+
+                    <div style="margin-top: 1rem;">
+                        <a href="https://leroyonline.co.za/kael/downloads/desktop/kael-os-1.0.0-x86_64.tar.gz" class="btn btn-primary" download>
+                            Download Linux Binary (7.0 MB)
+                        </a>
+                    </div>
+                </div>
+            </div>
+
+            <!-- AppImage Section -->
+            <div class="platform-section">
+                <h2>📦 AppImage (Universal)</h2>
+                <p style="color: var(--text-secondary); margin-bottom: 2rem;">
+                    Run on any Linux distribution without installation
+                </p>
+
+                <div class="install-steps">
+                    <div class="code-block">
+                        <code># Download AppImage
+wget https://github.com/leetheorc/Kael-OS-AI/releases/latest/download/Kael-OS.AppImage
+
+# Make executable
+chmod +x Kael-OS.AppImage
+
+# Run
+./Kael-OS.AppImage</code>
+                    </div>
+
+                    <div style="margin-top: 1rem;">
+                        <a href="https://github.com/leetheorc/Kael-OS-AI/releases/latest/download/Kael-OS.AppImage" class="btn btn-primary">
+                            Download AppImage
+                        </a>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Build from Source Section -->
+            <div class="platform-section">
+                <h2>🛠️ Build from Source</h2>
+                <p style="color: var(--text-secondary); margin-bottom: 2rem;">
+                    For developers and advanced users
+                </p>
+
+                <div class="install-steps">
+                    <h3 style="margin-bottom: 1rem;">Prerequisites</h3>
+                    <ul style="color: var(--text-secondary); margin-bottom: 1rem;">
+                        <li>Rust 1.70+ (install via <code style="background: var(--bg-primary); padding: 0.2rem 0.5rem; border-radius: 0.25rem;">rustup</code>)</li>
+                        <li>Node.js 18+</li>
+                        <li>System dependencies (webkit2gtk, gtk3, etc.)</li>
+                    </ul>
+
+                    <div class="code-block">
+                        <code># Clone repository
+git clone https://github.com/leetheorc/Kael-OS-AI.git
+cd Kael-OS-AI
+
+# Install dependencies
+./scripts/install-all.sh
+
+# Build release version
+cargo build --release --manifest-path Kael-OS-AI/src-tauri/Cargo.toml
+
+# Run
+cargo run --release --manifest-path Kael-OS-AI/src-tauri/Cargo.toml</code>
+                    </div>
+
+                    <div style="margin-top: 1rem;">
+                        <a href="https://github.com/leetheorc/Kael-OS-AI" class="btn btn-primary" target="_blank">
+                            View on GitHub
+                        </a>
+                    </div>
+                </div>
+            </div>
+
+            <!-- System Requirements -->
+            <div class="platform-section">
+                <h2>💻 System Requirements</h2>
+                
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 2rem; margin-top: 2rem;">
+                    <div class="feature-card">
+                        <h3>Minimum</h3>
+                        <ul style="color: var(--text-secondary); list-style: none; margin-top: 1rem;">
+                            <li>• CPU: 64-bit processor</li>
+                            <li>• RAM: 4GB</li>
+                            <li>• Storage: 2GB free space</li>
+                            <li>• OS: Linux kernel 5.0+</li>
+                        </ul>
+                    </div>
+                    <div class="feature-card">
+                        <h3>Recommended</h3>
+                        <ul style="color: var(--text-secondary); list-style: none; margin-top: 1rem;">
+                            <li>• CPU: Multi-core 64-bit</li>
+                            <li>• RAM: 8GB+</li>
+                            <li>• GPU: NVIDIA/AMD with 6GB+ VRAM</li>
+                            <li>• Storage: 10GB+ free space</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Next Steps -->
+            <div class="platform-section">
+                <h2>📚 Next Steps</h2>
+                <p style="color: var(--text-secondary); margin-bottom: 2rem;">
+                    After installing Kael-OS, here's what to do next:
+                </p>
+
+                <div class="docs-grid">
+                    <a href="docs.html#quick-start" class="docs-card">
+                        <div class="docs-card-icon">🚀</div>
+                        <h3>Quick Start Guide</h3>
+                        <p>Learn how to set up Ollama and start using local AI</p>
+                    </a>
+                    <a href="docs.html#configuration" class="docs-card">
+                        <div class="docs-card-icon">⚙️</div>
+                        <h3>Configuration</h3>
+                        <p>Configure AI models and system settings</p>
+                    </a>
+                    <a href="https://discord.gg/9mRjPxpShW" class="docs-card" target="_blank">
+                        <div class="docs-card-icon">💬</div>
+                        <h3>Get Support</h3>
+                        <p>Join our Discord community for help and discussions</p>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-section">
+                    <h4>Kael-OS</h4>
+                    <p>Local-first AI for Arch Linux</p>
+                </div>
+                <div class="footer-section">
+                    <h4>Resources</h4>
+                    <ul>
+                        <li><a href="docs.html">Documentation</a></li>
+                        <li><a href="download.html">Download</a></li>
+                        <li><a href="about.html">About</a></li>
+                    </ul>
+                </div>
+                <div class="footer-section">
+                    <h4>Community</h4>
+                    <ul>
+                        <li><a href="https://github.com/leetheorc/Kael-OS-AI" target="_blank">GitHub</a></li>
+                        <li><a href="https://discord.gg/9mRjPxpShW" target="_blank">Discord</a></li>
+                        <li><a href="https://github.com/leetheorc/Kael-OS-AI/discussions" target="_blank">Discussions</a></li>
+                    </ul>
+                </div>
+                <div class="footer-section">
+                    <h4>Legal</h4>
+                    <ul>
+                        <li><a href="https://github.com/leetheorc/Kael-OS-AI/blob/main/LICENSE" target="_blank">MIT License</a></li>
+                        <li><a href="#privacy">Privacy Policy</a></li>
+                    </ul>
+                </div>
+            </div>
+            <div class="footer-bottom">
+                <p>&copy; 2025 Kael-OS. Open source under MIT License.</p>
+            </div>
+        </div>
+    </footer>
+
+    <script src="script.js"></script>
+</body>
+</html>
