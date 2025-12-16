@@ -1,4 +1,6 @@
-# 🎉 Kael-OS v1.0.0 - OFFICIALLY LAUNCHED! 🚀
+# 🎉 Kael-OS v1.0.0-beta - PUBLIC BETA LAUNCH! 🚀
+
+**⚠️ Beta Release:** This is a beta version. We're actively collecting feedback and improving the app. Please report issues on [Discord](https://discord.gg/9mRjPxpShW) or [GitHub Issues](https://github.com/LeeTheOrc/kael-os/issues).
 
 ## What is Kael-OS?
 
