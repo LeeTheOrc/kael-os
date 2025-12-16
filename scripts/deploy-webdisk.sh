@@ -23,29 +23,57 @@ echo "Deploying $LOCAL_DIR to ${base_url}${WEBDAV_BASE_PATH}"
 
 # Ensure base subfolders exist
 for d in downloads docs arch repo pkgbuild; do
-  curl -sS -X MKCOL -u "${WEBDAV_USERNAME}:${WEBDAV_PASSWORD}" \
-    "${base_url}${WEBDAV_BASE_PATH}/$d" >/dev/null || true
+  curl -sS --insecure -X MKCOL -u "${WEBDAV_USERNAME}:${WEBDAV_PASSWORD}" \
+    "${base_url}${WEBDAV_BASE_PATH}/$d" >/dev/null 2>&1 || true
 done
 
 # Upload files preserving subpaths (one level)
 pushd "$LOCAL_DIR" >/dev/null
-for f in index.html; do
-  curl -sS -T "$f" -u "${WEBDAV_USERNAME}:${WEBDAV_PASSWORD}" \
-    "${base_url}${WEBDAV_BASE_PATH}/$f"
-done
 
-for sub in downloads docs arch repo pkgbuild; do
-  if [[ -f "$sub/index.html" ]]; then
-    curl -sS -T "$sub/index.html" -u "${WEBDAV_USERNAME}:${WEBDAV_PASSWORD}" \
-      "${base_url}${WEBDAV_BASE_PATH}/$sub/index.html"
+# Upload root HTML, CSS, JS files
+for f in *.html *.css *.js *.sh; do
+  if [[ -f "$f" ]]; then
+    echo "Uploading $f..."
+    curl -sS --insecure -T "$f" -u "${WEBDAV_USERNAME}:${WEBDAV_PASSWORD}" \
+      "${base_url}${WEBDAV_BASE_PATH}/$f"
   fi
 done
 
-# Upload PKGBUILD
-if [[ -f pkgbuild/PKGBUILD ]]; then
-  curl -sS -T pkgbuild/PKGBUILD -u "${WEBDAV_USERNAME}:${WEBDAV_PASSWORD}" \
-    "${base_url}${WEBDAV_BASE_PATH}/pkgbuild/PKGBUILD"
-fi
+# Upload subdirectory files
+for sub in downloads docs arch repo pkgbuild; do
+  if [[ -d "$sub" ]]; then
+    # Create subdirectory if needed
+    curl -sS --insecure -X MKCOL -u "${WEBDAV_USERNAME}:${WEBDAV_PASSWORD}" \
+      "${base_url}${WEBDAV_BASE_PATH}/$sub" >/dev/null 2>&1 || true
+    
+    # Upload all files in subdirectory
+    for f in "$sub"/*; do
+      if [[ -f "$f" ]]; then
+        echo "Uploading $f..."
+        curl -sS --insecure -T "$f" -u "${WEBDAV_USERNAME}:${WEBDAV_PASSWORD}" \
+          "${base_url}${WEBDAV_BASE_PATH}/$f"
+      fi
+    done
+  fi
+done
+
+# Upload nested downloads subdirectories
+for nested in downloads/desktop downloads/apk; do
+  if [[ -d "$nested" ]]; then
+    # Create nested directory
+    curl -sS --insecure -X MKCOL -u "${WEBDAV_USERNAME}:${WEBDAV_PASSWORD}" \
+      "${base_url}${WEBDAV_BASE_PATH}/$nested" >/dev/null 2>&1 || true
+    
+    for f in "$nested"/*; do
+      if [[ -f "$f" ]]; then
+        echo "Uploading $f..."
+        curl -sS --insecure -T "$f" -u "${WEBDAV_USERNAME}:${WEBDAV_PASSWORD}" \
+          "${base_url}${WEBDAV_BASE_PATH}/$f"
+      fi
+    done
+  fi
+done
+
 popd >/dev/null
 
 echo "Deploy complete."
