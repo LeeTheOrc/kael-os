@@ -59,8 +59,8 @@ makepkg -si</code>
 
                     <h3 style="margin-top: 2rem; margin-bottom: 1rem;">Direct Package Download</h3>
                     <div style="display: flex; gap: 1rem; margin-top: 1rem; flex-wrap: wrap;">
-                        <a href="https://leroyonline.co.za/kael/downloads/desktop/kael-os-1.0.0-x86_64.tar.gz" class="btn btn-primary" download>
-                            Download .tar.gz (7.0 MB)
+                        <a href="https://leroyonline.co.za/kael/downloads/desktop/kael-os-0.5.0-x86_64.tar.gz" class="btn btn-primary" download>
+                            Download .tar.gz (7.6 MB)
                         </a>
                         <a href="pkgbuild/PKGBUILD" class="btn btn-secondary" download>
                             Download PKGBUILD
@@ -86,14 +86,14 @@ makepkg -si</code>
 
                     <div class="code-block" style="margin-top: 1rem;">
                         <code># Download latest release
-wget https://leroyonline.co.za/kael/downloads/desktop/kael-os-1.0.0-x86_64.tar.gz
+wget https://leroyonline.co.za/kael/downloads/desktop/kael-os-0.5.0-x86_64.tar.gz
 
 # Verify checksum
-echo "e4988341e7978657d9a9fb528ef33635db673b00055af1d0d31efc11c0a524cf  kael-os-1.0.0-x86_64.tar.gz" | sha256sum -c
+echo "aaa04d8b18369d2a3c9a0f7ab52be464a590a8daedb7f43e887435786a7ba597  kael-os-0.5.0-x86_64.tar.gz" | sha256sum -c
 
 # Extract
-tar -xzf kael-os-1.0.0-x86_64.tar.gz
-cd kael-os-1.0.0-x86_64
+tar -xzf kael-os-0.5.0-x86_64.tar.gz
+cd kael-os-0.5.0-x86_64
 
 # Install (copies to /usr/bin and creates desktop entry)
 sudo ./install.sh
